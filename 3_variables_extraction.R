@@ -1,16 +1,17 @@
 library(tidyverse)
 
-meteo <- read.csv("data_meteofrance/data_meteofrance.csv") %>%
+meteo <- read.csv("data_meteofrance/data_meteofrance_2023_2024.csv") %>%
   mutate(date = as.Date(date)) %>%
-  mutate(TMIN_GDD = ifelse(TMIN>11, TMIN, 11),TMAX_GDD = case_when(TMAX<11~11, TMAX==11~11, TMAX==30~30, 11<TMAX & TMAX<30~TMAX, TMAX>30~30), GDDjour=(TMAX_GDD+TMIN_GDD)/2-11 ) %>%# Ajout du GDD par jour
+  mutate(TMIN_GDD = ifelse(TMIN>11, TMIN, 11),TMAX_GDD = case_when(TMAX<11~11, TMAX==11~11, TMAX==30~30, 11<TMAX & TMAX<30~TMAX, TMAX>30~30), GDDjour=(TMAX_GDD+TMIN_GDD)/2-11 ) %>%
   dplyr::select(-TMIN_GDD) %>%
   dplyr::select(-TMAX_GDD)
 
 
 pieges_data <- read.csv("piege_data.csv") %>%
-  mutate(num_releve = seq(1,nrow(.),1)) %>%
+  filter(!is.na(date_releve_jour)) %>%
   mutate(date_releve_jour = parse_date_time(date_releve_jour,"d/m/y"), date_instal_jour = parse_date_time(date_instal_jour,"d/m/y")) %>%
-  filter(!is.na(date_releve_jour))
+  mutate(num_releve = seq(1,nrow(.),1)) %>%
+  mutate(idpointdecapture = paste0(num_piege,"_",num_releve))
 
 
 lag_max <- 42
@@ -49,21 +50,23 @@ fun_summarize_week <- function(df_meteo_pieges2,var_to_summarize){
   if(grepl("RFD|GDDjour",var_to_summarize)){
     df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
       filter(var==var_to_summarize) %>%
-      group_by(idpointdecapture,lag_n = lubridate::week(date)) %>%
+      group_by(idpointdecapture, lag_n = lubridate::week(date), year = lubridate::year(date)) %>%
       dplyr::summarise(val=sum(val, na.rm = T),date = min(date)) %>%
       group_by(idpointdecapture) %>%
       mutate(lag_n=seq(n()-1,0,-1)) %>%
       mutate(var = var_to_summarize) %>%
-      as_tibble()
+      as_tibble() %>%
+      dplyr::select(-year)
   } else {
     df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
       filter(var==var_to_summarize) %>%
-      group_by(idpointdecapture,lag_n = lubridate::week(date)) %>%
+      group_by(idpointdecapture,lag_n = lubridate::week(date), year = lubridate::year(date)) %>%
       summarise(val=mean(val, na.rm = T),date = min(date)) %>%
       group_by(idpointdecapture) %>%
       mutate(lag_n=seq(n()-1,0,-1)) %>%
       mutate(var = var_to_summarize) %>%
-      as_tibble()
+      as_tibble() %>%
+      dplyr::select(-year)
   }
   return(df_meteo_pieges2_summarize)
 
@@ -107,18 +110,19 @@ meteo <- meteo %>%
 
 
 pieges_data2 <- pieges_data %>%
-  dplyr::select(num_releve, num_piege, date_releve_jour, dpt) %>%
+  dplyr::select(idpointdecapture, num_releve, num_piege, date_releve_jour, nom_commune) %>%
   mutate(date_releve_jour=as.Date(date_releve_jour))
 
 
-df_meteo_pieges <- data.frame(num_releve = numeric(),num_piege = character(), dpt = character(), date = character(), stringsAsFactors = F)
+df_meteo_pieges <- data.frame(idpointdecapture = character(), num_releve = numeric(),num_piege = character(), nom_commune = character(), date = character(), stringsAsFactors = F)
 for(i in 1:nrow(pieges_data2)){
+  cat(i/nrow(pieges_data2)*100,"%\n")
   for(j in 0:lag_max){
-    cat(i/nrow(pieges_data2)*100,"%\n")
     df_meteo_pieges <- rbind(df_meteo_pieges,
-                             data.frame(num_releve = pieges_data2$num_releve[i],
+                             data.frame(idpointdecapture = pieges_data2$idpointdecapture[i],
+                                        num_releve = pieges_data2$num_releve[i],
                                         num_piege = pieges_data2$num_piege[i],
-                                        dpt = pieges_data2$dpt[i],
+                                        nom_commune = pieges_data2$nom_commune[i],
                                         date = as.character(as.Date(pieges_data2$date_releve_jour[i]-j)),
                                         lag_n = j,
                                         stringsAsFactors = F))
@@ -127,9 +131,8 @@ for(i in 1:nrow(pieges_data2)){
 
 # summarizing to weeks
 df_meteo_pieges2 <- df_meteo_pieges %>%
-  left_join(meteo, by = c("date","dpt")) %>%
-  pivot_longer( !(num_releve:numer_sta), names_to = "var", values_to = 'val') %>%
-  mutate(idpointdecapture = paste0(num_piege,"_",num_releve))
+  left_join(meteo, by = c("date","nom_commune")) %>%
+  pivot_longer(!(idpointdecapture:numer_sta), names_to = "var", values_to = 'val')
 
 
 
@@ -190,4 +193,8 @@ df_meteo_pieges_summ_wide_meteofrance <- df_meteo_pieges_summ_wide1 %>%
   left_join(df_meteo_pieges_summ_wide17)
 
 
+df_model <- pieges_data %>%
+  dplyr::select(idpointdecapture , nom_commune, num_piege, date_releve_jour, effectif_jour_PP ) %>%
+  left_join(df_meteo_pieges_summ_wide_meteofrance, by = "idpointdecapture")
 
+write.csv(df_model, "df_model.csv", row.names = F)
