@@ -1,23 +1,140 @@
 library(tidyverse)
+library(patchwork)
+
+pieges_data <- read.csv("piege_data.csv") %>%
+  filter(!is.na(date_releve_jour), statut == "RAS") %>%
+  mutate(date_releve_jour = parse_date_time(date_releve_jour,"d/m/y"), week = week(date_releve_jour), month = month(date_releve_jour), year = year(date_releve_jour)) %>%
+  filter(dpt == "HERAULT") %>%
+  mutate(effectif_jour_PP = as.numeric(effectif_jour_PP)) %>%
+  mutate(year = factor(year, levels = c("2023", "2024")))
 
 
+df_meteofrance_historique <- read.csv("data_meteofrance/data_meteofrance_historique.csv") %>%
+  group_by(year, week) %>%
+  summarise(RFD = sum(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+  group_by(week) %>%
+  summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+            #RFD_sd = sd(RFD, na.rm = T), TMN_sd = sd(TMN, na.rm = T), TMIN_sd = sd(TMIN, na.rm = T), TMAX_sd = sd(TMAX, na.rm = T)) %>%
+  mutate(RFDcum = cumsum(RFD)) %>%
+  mutate(year = "moy. 1950-2022")
 
 
+df_meteofrance_2023_2024 <-  read.csv("data_meteofrance/data_meteofrance_2023_2024.csv") %>%
+  mutate(date = as.Date(date)) %>%
+  group_by(year, week) %>%
+  summarise(RFD = sum(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+  mutate(RFDcum = cumsum(RFD)) %>%
+  mutate(year = as.character(year))
+
+df_meteofrance <- rbind(df_meteofrance_historique,df_meteofrance_2023_2024) %>%
+  mutate(year = factor(year, levels = c("2023", "2024", "moy. 1950-2022")))
+
+
+cbp1 <-c("#FD9B63", "#E7D37F","#81A263")
+
+# précipitations
+scaleFactor1 <- max(df_meteofrance$RFDcum, na.rm = T) / max(pieges_data$effectif_jour_PP, na.rm = T)
+
+p1 <- ggplot() +
+  geom_line(aes(x = as.factor(df_meteofrance$week), y = df_meteofrance$RFDcum, colour = as.factor(df_meteofrance$year), group =  as.factor(df_meteofrance$year)), size = 0.5) +
+  geom_boxplot(aes(x = as.factor(pieges_data$week), y = pieges_data$effectif_jour_PP * scaleFactor1, fill = as.factor(pieges_data$year)), outlier.shape = NA, position = position_dodge(preserve = "single"), size = 0.3) +
+  scale_y_continuous(name = "précipitation cumulées (mm)", sec.axis = sec_axis(~./scaleFactor1, name = "effectif jour PP")) +
+  scale_fill_manual(values = cbp1, name = "Collectes larves") +
+  scale_color_manual(values = cbp1, name = "Facteur météorologique") +
+  labs(title="Larves albo et précipitation cumulées", x ="Semaine") +
+  theme_bw()
+
+
+# températures
+scaleFactor2 <- max(df_meteofrance$TMN, na.rm = T) / max(pieges_data$effectif_jour_PP, na.rm = T)
+
+p2 <- ggplot() +
+  geom_line(aes(x = as.factor(df_meteofrance$week), y = df_meteofrance$TMN, colour = as.factor(df_meteofrance$year), group =  as.factor(df_meteofrance$year)), size = 0.5) +
+  geom_boxplot(aes(x = as.factor(pieges_data$week), y = pieges_data$effectif_jour_PP * scaleFactor2, fill = as.factor(pieges_data$year)), outlier.shape = NA, position = position_dodge(preserve = "single"), size = 0.3) +
+  scale_y_continuous(name = "températures (°C)", sec.axis = sec_axis(~./scaleFactor2, name = "effectif jour PP")) +
+  scale_fill_manual(values = cbp1, name = "Collectes larves") +
+  scale_color_manual(values = cbp1, name = "Facteur météorologique") +
+  labs(title="Larves albo et températures", x ="Semaine") +
+  theme_bw()
+
+p2/p1 + plot_layout(guides = "collect")
+
+## par site - pas forcément très pertinent...
+#
+# pieges_data <- read.csv("piege_data.csv") %>%
+#   filter(!is.na(date_releve_jour)) %>%
+#   mutate(date_releve_jour = parse_date_time(date_releve_jour,"d/m/y"), week = week(date_releve_jour), month = month(date_releve_jour), year = year(date_releve_jour)) %>%
+#   filter(dpt == "HERAULT") %>%
+#   mutate(effectif_jour_PP = as.numeric(effectif_jour_PP)) %>%
+#   mutate(year = factor(year, levels = c("2023", "2024")))
+#
 # df_meteofrance_historique <- read.csv("data_meteofrance/data_meteofrance_historique.csv") %>%
-#   mutate(first_day_month = as.Date(first_day_month))
+#   group_by(year, week) %>%
+#   summarise(RFD = sum(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+#   group_by(week) %>%
+#   summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+#   #RFD_sd = sd(RFD, na.rm = T), TMN_sd = sd(TMN, na.rm = T), TMIN_sd = sd(TMIN, na.rm = T), TMAX_sd = sd(TMAX, na.rm = T)) %>%
+#   mutate(RFDcum = cumsum(RFD)) %>%
+#   mutate(year = "1950-2022")
+#
+# df_meteofrance_historique <- rbind(df_meteofrance_historique %>% mutate(nom_commune="MURVIEL-LES-MONTPELLIER"),
+#                                    df_meteofrance_historique %>% mutate(nom_commune="PEROLS"))
 #
 # df_meteofrance_2023_2024 <-  read.csv("data_meteofrance/data_meteofrance_2023_2024.csv") %>%
-#   mutate(date = as.Date(date))
+#   mutate(date = as.Date(date)) %>%
+#   group_by(year, week, nom_commune) %>%
+#   summarise(RFD = sum(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+#   group_by(nom_commune) %>%
+#   mutate(RFDcum = cumsum(RFD)) %>%
+#   mutate(year = as.character(year))
 #
-# ggplot(df_meteofrance_historique, aes(x=first_day_month,y=TMN)) + geom_line() + geom_smooth()
+# df_meteofrance <- rbind(df_meteofrance_historique,df_meteofrance_2023_2024) %>%
+#   mutate(year = factor(year, levels = c("2023", "2024", "1950-2022")))
+
+
+# pieges_data_murv <- pieges_data %>% filter(nom_commune=="MURVIEL-LES-MONTPELLIER")
+# df_meteofrance_murv <- df_meteofrance %>% filter(nom_commune=="MURVIEL-LES-MONTPELLIER")
 #
-# df_meteofrance_historique_grouped_month <- df_meteofrance_historique %>%
-#   group_by(mois=month(first_day_month)) %>%
-#   summarise(TMN = mean(TMN, na.rm = T))
+# scaleFactor <- max(df_meteofrance_murv$RFDcum, na.rm = T) / max(pieges_data_murv$effectif_jour_PP, na.rm = T)
 #
-# df_meteofrance_2023_2024_grouped_month <- df_meteofrance_2023_2024 %>%
-#   group_by(year=year(date),mois=month(date)) %>%
-#   summarise(TMN = mean(TMN, na.rm = T))
+# ggplot() +
+#   geom_line(aes(x = as.factor(df_meteofrance_murv$week), y = df_meteofrance_murv$RFDcum, colour = as.factor(df_meteofrance_murv$year), group =  as.factor(df_meteofrance_murv$year)), size = 0.5) +
+#   geom_boxplot(aes(x = as.factor(pieges_data_murv$week), y = pieges_data_murv$effectif_jour_PP * scaleFactor, fill = as.factor(pieges_data_murv$year)), outlier.shape = NA, position = position_dodge(preserve = "single"), size = 0.3) +
+#   scale_y_continuous(name = "RFDcum", sec.axis = sec_axis(~./scaleFactor, name = "nb larves albo")) +
+#   scale_fill_manual(values = cbp1) +
+#   scale_color_manual(values = cbp1) +
+#   theme_bw()
+#
+#
+#
+#
+# pieges_data_per <- pieges_data %>% filter(nom_commune=="PEROLS")
+# df_meteofrance_per <- df_meteofrance %>% filter(nom_commune=="PEROLS")
+#
+# scaleFactor <- max(df_meteofrance_per$RFDcum, na.rm = T) / max(pieges_data_per$effectif_jour_PP, na.rm = T)
+#
+# ggplot() +
+#   geom_line(aes(x = as.factor(df_meteofrance_per$week), y = df_meteofrance_per$RFDcum, colour = as.factor(df_meteofrance_per$year), group =  as.factor(df_meteofrance_per$year)), size = 0.5) +
+#   geom_boxplot(aes(x = as.factor(pieges_data_per$week), y = pieges_data_per$effectif_jour_PP * scaleFactor, fill = as.factor(pieges_data_per$year)), outlier.shape = NA, position = position_dodge(preserve = "single"), size = 0.3) +
+#   scale_y_continuous(name = "RFDcum", sec.axis = sec_axis(~./scaleFactor, name = "nb larves albo")) +
+#   scale_fill_manual(values = cbp1) +
+#   scale_color_manual(values = cbp1) +
+#   theme_bw()
+#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

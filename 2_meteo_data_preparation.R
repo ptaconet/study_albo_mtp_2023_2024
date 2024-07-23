@@ -32,8 +32,8 @@
 
 df_meteofrance_2023_2024 <- read_delim("data_meteofrance/dpt_34_2023_2024.csv.gz", delim = ";", na = "", show_col_types = FALSE) %>%
   filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD")) %>%
-  mutate(date = parse_date_time(AAAAMMJJ,"ymd")) %>%
-  group_by(NOM_USUEL,date) %>%
+  mutate(date = parse_date_time(AAAAMMJJ,"ymd"), year = year(date), month = month(date), week = week(date)) %>%
+  group_by(NOM_USUEL,date,year,month,week) %>%
   summarise(RFD = sum(RR, na.rm = T),
             TMN = mean(TM, na.rm = T),
             TMIN = mean(TN, na.rm = T),
@@ -50,12 +50,8 @@ write.csv(df_meteofrance_2023_2024,"data_meteofrance/data_meteofrance_2023_2024.
 
 df_meteofrance_historique <- read_delim("data_meteofrance/dpt_34_historique.csv.gz", delim = ";", na = "", show_col_types = FALSE) %>%
   filter(NOM_USUEL == "MONTPELLIER-AEROPORT") %>%
-  mutate(date = parse_date_time(AAAAMMJJ,"ymd")) %>%
-  mutate(first_day_month  = paste0(substr(date,1,8),"01")) %>%
-  group_by(first_day_month) %>%
-  summarise(RFD = sum(RR, na.rm = T),
-            TMN = mean(TM, na.rm = T),
-            TMIN = mean(TN, na.rm = T),
-            TMAX = mean(TX, na.rm = T))
+  mutate(date = parse_date_time(AAAAMMJJ,"ymd"), year = year(date), month = month(date), week = week(date)) %>%
+  rename(RFD = RR, TMN = TM, TMIN = TN , TMAX = TX) %>%
+  dplyr::select(date, year, month, week, RFD, TMN, TMIN, TMAX)
 
 write.csv(df_meteofrance_historique,"data_meteofrance/data_meteofrance_historique.csv", row.names = F)
