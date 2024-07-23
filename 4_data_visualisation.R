@@ -26,11 +26,22 @@ df_meteofrance_2023_2024 <-  read.csv("data_meteofrance/data_meteofrance_2023_20
   mutate(RFDcum = cumsum(RFD)) %>%
   mutate(year = as.character(year))
 
-df_meteofrance <- rbind(df_meteofrance_historique,df_meteofrance_2023_2024) %>%
-  mutate(year = factor(year, levels = c("2023", "2024", "moy. 1950-2022")))
+
+df_meteofrance_proj <-  read.delim("data_meteofrance/tasmintasmaxtasprtothusssfcwind_France_CNRM-CERFACS-CNRM-CM5_CNRM-ALADIN63_rcp4.5_METEO-FRANCE_ADAMONT-France_SAFRAN_day_20230101-21001231.txt", skip = 64, sep = ",", col.names = c("Date", "Latitude", "Longitude",  "tasminAdjust", "tasmaxAdjust" ,"tasAdjust", "prtotAdjust" ,"hussAdjust", "sfcWindAdjust"),  na.strings = "-999.99") %>%
+  mutate(date = parse_date_time(Date,"ymd"), week = week(date), year = year(date)) %>%
+  group_by(year, week) %>%
+  summarise(RFD = sum(prtotAdjust, na.rm = T)*86400, TMN = mean(tasAdjust, na.rm = T)-273.15, TMIN = mean(tasminAdjust, na.rm = T)-273.15, TMAX = mean(tasmaxAdjust, na.rm = T)-273.15) %>%
+  group_by(week) %>%
+  summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+  mutate(RFDcum = cumsum(RFD)) %>%
+  mutate(year = "proj. 2023-2100 (scenario rcp4.5)")
 
 
-cbp1 <-c("#FD9B63", "#E7D37F","#81A263")
+df_meteofrance <- rbind(df_meteofrance_historique,df_meteofrance_2023_2024,df_meteofrance_proj) %>%
+  mutate(year = factor(year, levels = c("2023", "2024", "moy. 1950-2022","proj. 2023-2100 (scenario rcp4.5)")))
+
+
+cbp1 <-c("#FD9B63", "#E7D37F","#81A263","#B60071")
 
 # précipitations
 scaleFactor1 <- max(df_meteofrance$RFDcum, na.rm = T) / max(pieges_data$effectif_jour_PP, na.rm = T)
