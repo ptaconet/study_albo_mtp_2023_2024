@@ -175,7 +175,7 @@ ggplot(df_model, aes(x = as.factor(week_number), y = effectif_jour_PP, fill = as
 
 
 ## Boxplots larves ~ conditions météo
-df_meteo <- read.csv("data_meteofrance/data_meteofrance.csv")  %>%
+df_meteo <- read.csv("data_meteofrance/data_meteofrance_2023_2024.csv")  %>%
   mutate(date = as.Date(date)) %>%
   filter(date > min(df_model$date_releve_jour, na.rm = T) - 30, date < max(df_model$date_releve_jour, na.rm = T) + 30) %>%
   mutate(week = floor_date(date, "weeks")) %>%
@@ -197,7 +197,7 @@ plot_albo_precipitations <- ggplot() +
 
 
 
-df_meteo <- read.csv("data_meteofrance/data_meteofrance.csv")  %>%
+df_meteo <- read.csv("data_meteofrance/data_meteofrance_2023_2024.csv")  %>%
   mutate(date = as.Date(date)) %>%
   filter(date >= "2023-01-01", date < max(df_model$date_releve_jour, na.rm = T) + 30) %>%
   mutate(week = floor_date(date, "weeks")) %>%
@@ -221,7 +221,7 @@ ggplot() +
 
 
 
-df_meteo <- read.csv("data_meteofrance/data_meteofrance.csv")  %>%
+df_meteo <- read.csv("data_meteofrance/data_meteofrance_2023_2024.csv")  %>%
   mutate(date = as.Date(date)) %>%
   filter(date >= "2023-01-01") %>%
   mutate(week_number = week(date), year = year(date)) %>%
@@ -260,7 +260,7 @@ ggplot(df_model, aes(x = TMN_0_4	, y = effectif_jour_PP, color = year(date_relev
 
 
 
-df_meteo <- read.csv("data_meteofrance/data_meteofrance.csv")  %>%
+df_meteo <- read.csv("data_meteofrance/data_meteofrance_2023_2024.csv")  %>%
   mutate(date = as.Date(date)) %>%
   filter(date >= "2023-01-01") %>%
   mutate(week = week(date), year = year(date)) %>%

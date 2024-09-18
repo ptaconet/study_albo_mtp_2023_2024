@@ -47,7 +47,6 @@ df_meteofrance_2023_2024 <- read_delim("data_meteofrance/dpt_34_2023_2024.csv.gz
 write.csv(df_meteofrance_2023_2024,"data_meteofrance/data_meteofrance_2023_2024.csv", row.names = F)
 
 
-
 df_meteofrance_historique <- read_delim("data_meteofrance/dpt_34_historique.csv.gz", delim = ";", na = "", show_col_types = FALSE) %>%
   filter(NOM_USUEL == "MONTPELLIER-AEROPORT") %>%
   mutate(date = parse_date_time(AAAAMMJJ,"ymd"), year = year(date), month = month(date), week = week(date)) %>%
