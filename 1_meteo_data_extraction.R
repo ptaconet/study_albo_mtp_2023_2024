@@ -21,9 +21,15 @@ library(httr)
 
 ## Source : https://www.data.gouv.fr/fr/datasets/donnees-climatologiques-de-base-quotidiennes/#/resources
 
-# données 2023-2024
-httr::GET("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_34_latest-2023-2024_RR-T-Vent.csv.gz",httr::write_disk(file.path("data_meteofrance","dpt_34_2023_2024.csv.gz")),httr::progress(),config = list(maxredirs=-1))
+liste_departements <- c(33,34,64)
 
+for(i in 1:length(liste_departements)){
+# données 2023-2024
+httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_latest-2023-2024_RR-T-Vent.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_2023_2024_RR-T-Vent.csv.gz"))),httr::progress(),config = list(maxredirs=-1))
+httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_latest-2023-2024_autres-parametres.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_2023_2024_autres_parametres.csv.gz"))),httr::progress(),config = list(maxredirs=-1))
 
 # donnees historiques
-httr::GET("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_34_previous-1950-2022_RR-T-Vent.csv.gz",httr::write_disk(file.path("data_meteofrance","dpt_34_historique.csv.gz")),httr::progress(),config = list(maxredirs=-1))
+httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_previous-1950-2022_RR-T-Vent.csv.gz"),httr::write_disk(file.path("data","meteofrance",paste0("dpt_",liste_departements[i],"_historique_RR-T-Vent.csv.gz"))),httr::progress(),config = list(maxredirs=-1))
+httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_previous-1950-2022_autres-parametres.csv.gz"),httr::write_disk(file.path("data","meteofrance",paste0("dpt_",liste_departements[i],"_historique_autres_parametres.csv.gz"))),httr::progress(),config = list(maxredirs=-1))
+
+}

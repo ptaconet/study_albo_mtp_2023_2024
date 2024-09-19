@@ -1,20 +1,23 @@
 library(tidyverse)
 
-meteo <- read.csv("data_meteofrance/data_meteofrance_2023_2024.csv") %>%
+meteo <- read.csv(file.path("data","processed","data_meteofrance_2023_2024.csv")) %>%
+  rename(site = nom_commune) %>%
   mutate(date = as.Date(date)) %>%
-  mutate(TMIN_GDD = ifelse(TMIN>11, TMIN, 11),TMAX_GDD = case_when(TMAX<11~11, TMAX==11~11, TMAX==30~30, 11<TMAX & TMAX<30~TMAX, TMAX>30~30), GDDjour=(TMAX_GDD+TMIN_GDD)/2-11 ) %>%
-  dplyr::select(-TMIN_GDD) %>%
-  dplyr::select(-TMAX_GDD)
+  mutate(TN_GDD = ifelse(TN>11, TN, 11),TX_GDD = case_when(TX<11~11, TX==11~11, TX==30~30, 11<TX & TX<30~TX, TX>30~30), GDDjour=(TX_GDD+TN_GDD)/2-11 ) %>%
+  dplyr::select(-TN_GDD) %>%
+  dplyr::select(-TX_GDD)
 
+meteo2 <- meteo %>% filter(site=="PEROLS") %>% mutate(site="MONTPELLIER")
 
-pieges_data <- read.csv("piege_data.csv") %>%
-  filter(!is.na(date_releve_jour)) %>%
-  mutate(date_releve_jour = parse_date_time(date_releve_jour,"d/m/y"), date_instal_jour = parse_date_time(date_instal_jour,"d/m/y")) %>%
+meteo = bind_rows(meteo,meteo2)
+
+pieges_data <- read.csv( file.path("data","processed","df_pieges.csv")) %>%
+  filter(!is.na(date_releve)) %>%
   mutate(num_releve = seq(1,nrow(.),1)) %>%
   mutate(idpointdecapture = paste0(num_piege,"_",num_releve))
 
 
-lag_max <- 42
+lag_max <- 48
 
 
 
@@ -45,32 +48,108 @@ while (i<=nrow(meteo)){
 
 #### Functions
 
-fun_summarize_week <- function(df_meteo_pieges2,var_to_summarize){
+fun_summarize_week <- function(df_meteo_pieges2,var_to_summarize,fun_summarize,new_var_name){
 
-  if(grepl("RFD|GDDjour",var_to_summarize)){
+  if(fun_summarize=="sum"){
     df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
       filter(var==var_to_summarize) %>%
-      group_by(idpointdecapture, lag_n = lubridate::week(date), year = lubridate::year(date)) %>%
-      dplyr::summarise(val=sum(val, na.rm = T),date = min(date)) %>%
+      #group_by(idpointdecapture, lag_n = lubridate::week(date), year = lubridate::year(date)) %>%
+      mutate(lag_n = floor(lag_n/7)) %>%  # 7 is for 7 days
+      group_by(idpointdecapture, lag_n, year = lubridate::year(date)) %>%
+      dplyr::summarise(val=sum(val, na.rm = T),date = max(date)) %>%
       group_by(idpointdecapture) %>%
-      mutate(lag_n=seq(n()-1,0,-1)) %>%
-      mutate(var = var_to_summarize) %>%
+      mutate(lag_n=seq(0,n()-1,1)) %>%
+      mutate(var = new_var_name) %>%
       as_tibble() %>%
       dplyr::select(-year)
-  } else {
+  } else if (fun_summarize == "mean"){
     df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
       filter(var==var_to_summarize) %>%
-      group_by(idpointdecapture,lag_n = lubridate::week(date), year = lubridate::year(date)) %>%
-      summarise(val=mean(val, na.rm = T),date = min(date)) %>%
+      #group_by(idpointdecapture,lag_n = lubridate::week(date), year = lubridate::year(date)) %>%
+      mutate(lag_n = floor(lag_n/7)) %>%  # 7 is for 7 days
+      group_by(idpointdecapture, lag_n, year = lubridate::year(date)) %>%
+      summarise(val=mean(val, na.rm = T),date = max(date)) %>%
       group_by(idpointdecapture) %>%
-      mutate(lag_n=seq(n()-1,0,-1)) %>%
-      mutate(var = var_to_summarize) %>%
+      mutate(lag_n=seq(0,n()-1,1)) %>%
+      mutate(var = new_var_name) %>%
+      as_tibble() %>%
+      dplyr::select(-year)
+  }  else if (fun_summarize == "max"){
+    df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
+      filter(var==var_to_summarize) %>%
+      #group_by(idpointdecapture,lag_n = lubridate::week(date), year = lubridate::year(date)) %>%
+      mutate(lag_n = floor(lag_n/7)) %>%  # 7 is for 7 days
+      group_by(idpointdecapture, lag_n, year = lubridate::year(date)) %>%
+      summarise(val=max(val, na.rm = T),date = max(date)) %>%
+      group_by(idpointdecapture) %>%
+      mutate(lag_n=seq(0,n()-1,1)) %>%
+      mutate(var = new_var_name) %>%
+      as_tibble() %>%
+      dplyr::select(-year)
+  }  else if (fun_summarize == "min"){
+    df_meteo_pieges2_summarize <- df_meteo_pieges2 %>%
+      filter(var==var_to_summarize) %>%
+      #group_by(idpointdecapture,lag_n = lubridate::week(date), year = lubridate::year(date)) %>%
+      mutate(lag_n = floor(lag_n/7)) %>%  # 7 is for 7 days
+      group_by(idpointdecapture, lag_n, year = lubridate::year(date)) %>%
+      summarise(val=min(val, na.rm = T),date = max(date)) %>%
+      group_by(idpointdecapture) %>%
+      mutate(lag_n=seq(0,n()-1,1)) %>%
+      mutate(var = new_var_name) %>%
       as_tibble() %>%
       dplyr::select(-year)
   }
   return(df_meteo_pieges2_summarize)
 
 }
+
+
+meteo <- meteo %>%
+  #filter(!is.na(RFD), !is.na(TMIN), !is.na(TMAX), !is.na(TMN), !is.na(TAMP), !is.na(TSD), !is.na(RHMIN), !is.na(RHMAX), !is.na(RHMN), !is.na(RHAMP), !is.na(RHSD), !is.na(WINDMIN), !is.na(WINDMAX), !is.na(WINDMN) ) %>%
+  mutate(date = as.character(date))
+
+
+pieges_data2 <- pieges_data %>%
+  dplyr::select(idpointdecapture, num_releve, num_piege, date_releve, site) %>%
+  mutate(date_releve=as.Date(date_releve))
+
+
+df_meteo_pieges <- data.frame(idpointdecapture = character(), num_releve = numeric(),num_piege = character(), site = character(), date = character(), stringsAsFactors = F)
+for(i in 1:nrow(pieges_data2)){
+  cat(i/nrow(pieges_data2)*100,"%\n")
+  for(j in 0:lag_max){
+    df_meteo_pieges <- rbind(df_meteo_pieges,
+                             data.frame(idpointdecapture = pieges_data2$idpointdecapture[i],
+                                        num_releve = pieges_data2$num_releve[i],
+                                        num_piege = pieges_data2$num_piege[i],
+                                        site = pieges_data2$site[i],
+                                        date = as.character(as.Date(pieges_data2$date_releve[i]-j)),
+                                        lag_n = j,
+                                        stringsAsFactors = F))
+  }
+}
+
+# summarizing to weeks
+df_meteo_pieges2 <- df_meteo_pieges %>%
+  left_join(meteo, by = c("date","site")) %>%
+  pivot_longer(!(idpointdecapture:lag_n), names_to = "var", values_to = 'val')
+
+
+
+df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RR","sum","RR") %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"RR","max","RRMAX")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"DRR","sum","DRR")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"TN","min","TN")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"TX","max","TX")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"TM","mean","TM")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"TAMPLI","mean","TAMPLI")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"FFM","mean","FFM")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"FXY","mean","FXY")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"UM","mean","UM")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDjour","sum","GDDjour")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDacc","mean","GDDacc")) %>%
+  bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDbound","mean","GDDbound"))
+
 
 
 # function to create the data.frame for CCM
@@ -91,6 +170,10 @@ fun_ccm_df <- function(df_timeseries, varr, function_to_apply){
         df_timeseries_wide[column_name] <- rowMeans(df_timeseries_wide[,i:j], na.rm = T)
       } else if (function_to_apply=="sum"){
         df_timeseries_wide[column_name] <- rowSums(df_timeseries_wide[,i:j], na.rm = T)
+      } else if (function_to_apply=="max"){
+        df_timeseries_wide[column_name] <- max(df_timeseries_wide[,i:j], na.rm = T)
+      } else if (function_to_apply=="min"){
+        df_timeseries_wide[column_name] <- min(df_timeseries_wide[,i:j], na.rm = T)
       }
     }
   }
@@ -104,75 +187,23 @@ fun_ccm_df <- function(df_timeseries, varr, function_to_apply){
 }
 
 
-meteo <- meteo %>%
-  filter(!is.na(RFD), !is.na(TMIN), !is.na(TMAX), !is.na(TMN), !is.na(TAMP), !is.na(TSD), !is.na(RHMIN), !is.na(RHMAX), !is.na(RHMN), !is.na(RHAMP), !is.na(RHSD), !is.na(WINDMIN), !is.na(WINDMAX), !is.na(WINDMN) ) %>%
-  mutate(date = as.character(date))
 
-
-pieges_data2 <- pieges_data %>%
-  dplyr::select(idpointdecapture, num_releve, num_piege, date_releve_jour, nom_commune) %>%
-  mutate(date_releve_jour=as.Date(date_releve_jour))
-
-
-df_meteo_pieges <- data.frame(idpointdecapture = character(), num_releve = numeric(),num_piege = character(), nom_commune = character(), date = character(), stringsAsFactors = F)
-for(i in 1:nrow(pieges_data2)){
-  cat(i/nrow(pieges_data2)*100,"%\n")
-  for(j in 0:lag_max){
-    df_meteo_pieges <- rbind(df_meteo_pieges,
-                             data.frame(idpointdecapture = pieges_data2$idpointdecapture[i],
-                                        num_releve = pieges_data2$num_releve[i],
-                                        num_piege = pieges_data2$num_piege[i],
-                                        nom_commune = pieges_data2$nom_commune[i],
-                                        date = as.character(as.Date(pieges_data2$date_releve_jour[i]-j)),
-                                        lag_n = j,
-                                        stringsAsFactors = F))
-  }
-}
-
-# summarizing to weeks
-df_meteo_pieges2 <- df_meteo_pieges %>%
-  left_join(meteo, by = c("date","nom_commune")) %>%
-  pivot_longer(!(idpointdecapture:numer_sta), names_to = "var", values_to = 'val')
+df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RR","sum")
+df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"RRMAX","mean")
+df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"DRR","sum")
+df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TN","mean")
+df_meteo_pieges_summ_wide5 <- fun_ccm_df(df_meteo_pieges_summ,"TX","mean")
+df_meteo_pieges_summ_wide6 <- fun_ccm_df(df_meteo_pieges_summ,"TM","mean")
+df_meteo_pieges_summ_wide7 <- fun_ccm_df(df_meteo_pieges_summ,"TAMPLI","mean")
+df_meteo_pieges_summ_wide8 <- fun_ccm_df(df_meteo_pieges_summ,"FFM","mean")
+df_meteo_pieges_summ_wide9 <- fun_ccm_df(df_meteo_pieges_summ,"FXY","mean")
+df_meteo_pieges_summ_wide10 <- fun_ccm_df(df_meteo_pieges_summ,"UM","mean")
+df_meteo_pieges_summ_wide11 <- fun_ccm_df(df_meteo_pieges_summ,"GDDjour","sum")
+df_meteo_pieges_summ_wide12 <- fun_ccm_df(df_meteo_pieges_summ,"GDDacc","mean")
+df_meteo_pieges_summ_wide13 <- fun_ccm_df(df_meteo_pieges_summ,"GDDbound","mean")
 
 
 
-df_meteo_pieges_summ <- fun_summarize_week(df_meteo_pieges2,"RFD") %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"TMIN")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"TMAX")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"TMN")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"TAMP")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"TSD")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"RHMIN")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"RHMAX")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"RHMN")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"RHAMP")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"RHSD")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"WINDMIN")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"WINDMAX")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"WINDMN")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDjour")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDacc")) %>%
-  bind_rows(fun_summarize_week(df_meteo_pieges2,"GDDbound"))
-
-
-
-df_meteo_pieges_summ_wide1 <- fun_ccm_df(df_meteo_pieges_summ,"RFD","sum")
-df_meteo_pieges_summ_wide2 <- fun_ccm_df(df_meteo_pieges_summ,"TMIN","mean")
-df_meteo_pieges_summ_wide3 <- fun_ccm_df(df_meteo_pieges_summ,"TMAX","mean")
-df_meteo_pieges_summ_wide4 <- fun_ccm_df(df_meteo_pieges_summ,"TMN","mean")
-df_meteo_pieges_summ_wide5 <- fun_ccm_df(df_meteo_pieges_summ,"TAMP","mean")
-df_meteo_pieges_summ_wide6 <- fun_ccm_df(df_meteo_pieges_summ,"TSD","mean")
-df_meteo_pieges_summ_wide7 <- fun_ccm_df(df_meteo_pieges_summ,"RHMIN","mean")
-df_meteo_pieges_summ_wide8 <- fun_ccm_df(df_meteo_pieges_summ,"RHMAX","mean")
-df_meteo_pieges_summ_wide9 <- fun_ccm_df(df_meteo_pieges_summ,"RHMN","mean")
-df_meteo_pieges_summ_wide10 <- fun_ccm_df(df_meteo_pieges_summ,"RHAMP","mean")
-df_meteo_pieges_summ_wide11 <- fun_ccm_df(df_meteo_pieges_summ,"RHSD","mean")
-df_meteo_pieges_summ_wide12 <- fun_ccm_df(df_meteo_pieges_summ,"WINDMIN","mean")
-df_meteo_pieges_summ_wide13 <- fun_ccm_df(df_meteo_pieges_summ,"WINDMAX","mean")
-df_meteo_pieges_summ_wide14 <- fun_ccm_df(df_meteo_pieges_summ,"WINDMN","mean")
-df_meteo_pieges_summ_wide15 <- fun_ccm_df(df_meteo_pieges_summ,"GDDjour","sum")
-df_meteo_pieges_summ_wide16 <- fun_ccm_df(df_meteo_pieges_summ,"GDDacc","mean")
-df_meteo_pieges_summ_wide17 <- fun_ccm_df(df_meteo_pieges_summ,"GDDbound","mean")
 
 df_meteo_pieges_summ_wide_meteofrance <- df_meteo_pieges_summ_wide1 %>%
   left_join(df_meteo_pieges_summ_wide2) %>%
@@ -186,15 +217,13 @@ df_meteo_pieges_summ_wide_meteofrance <- df_meteo_pieges_summ_wide1 %>%
   left_join(df_meteo_pieges_summ_wide10) %>%
   left_join(df_meteo_pieges_summ_wide11) %>%
   left_join(df_meteo_pieges_summ_wide12) %>%
-  left_join(df_meteo_pieges_summ_wide13) %>%
-  left_join(df_meteo_pieges_summ_wide14) %>%
-  left_join(df_meteo_pieges_summ_wide15) %>%
-  left_join(df_meteo_pieges_summ_wide16) %>%
-  left_join(df_meteo_pieges_summ_wide17)
+  left_join(df_meteo_pieges_summ_wide13)
+
+
 
 
 df_model <- pieges_data %>%
-  dplyr::select(idpointdecapture , nom_commune, num_piege, date_releve_jour, effectif_jour_PP ) %>%
+  dplyr::select(idpointdecapture , site, num_piege, Latitude, Longitude , date_releve, effectif_jour_PP ) %>%
   left_join(df_meteo_pieges_summ_wide_meteofrance, by = "idpointdecapture")
 
 write.csv(df_model, "df_model.csv", row.names = F)
