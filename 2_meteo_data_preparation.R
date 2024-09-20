@@ -1,6 +1,53 @@
-# library(tidyverse)
-# library(furrr)
-#
+library(tidyverse)
+
+
+df_meteofrance_RR_T_Vent <- list.files(file.path("data","raw","meteofrance"), full.names = T, pattern = "RR-T-Vent.csv.gz") %>%
+  purrr::map_dfr(.,~read_delim(., delim = ";", show_col_types = FALSE, na = "")) %>%
+  filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD","BORDEAUX-MERIGNAC","BIARRITZ-PAYS-BASQUE","BEDARIEUX"))
+
+df_meteofrance_autres_parametres <- list.files(file.path("data","raw","meteofrance"), full.names = T, pattern = "autres_parametres.csv.gz") %>%
+  purrr::map_dfr(.,~read_delim(., delim = ";", show_col_types = FALSE, na = "")) %>%
+  filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD","BORDEAUX-MERIGNAC","BIARRITZ-PAYS-BASQUE","BEDARIEUX"))
+
+df_meteofrance <- df_meteofrance_RR_T_Vent %>%
+  left_join(df_meteofrance_autres_parametres) %>%
+  mutate(date = parse_date_time(AAAAMMJJ,"ymd")) %>%
+  dplyr::select( NOM_USUEL , date, RR, DRR, TM, TN, TX, TAMPLI, FFM, FXY, UM) %>%
+  mutate(DRR = DRR/60) %>% # passer les minutes en heures
+  rename(nom_commune = NOM_USUEL) %>%
+  mutate(nom_commune = case_when(nom_commune=="MONTPELLIER-AEROPORT" ~ "PEROLS",
+                                 nom_commune=="MONTARNAUD" ~ "MURVIEL-LES-MONTPELLIER",
+                                 nom_commune=="BORDEAUX-MERIGNAC" ~ "SAINT-MEDARD-EN-JALLES",
+                                 nom_commune=="BIARRITZ-PAYS-BASQUE" ~ "BAYONNE",
+                                 nom_commune=="BEDARIEUX" ~ "BEDARIEUX"))
+
+# on comble les trous pour MURVIEL (DRR, FFM, FMX, UM) avec les données de BEDARIEUX (station la plus proche) puis on enleve bedarieux
+df_meteofrance_bedarieux <- df_meteofrance %>%
+  filter(nom_commune=="BEDARIEUX") %>%
+  dplyr::select( nom_commune  ,    date,  DRR,FFM ,  FXY ,   UM) %>%
+  rename(DRR2=DRR,FFM2=FFM ,  FXY2=FXY ,   UM2=UM) %>%
+  mutate(nom_commune = "MURVIEL-LES-MONTPELLIER")
+
+df_meteofrance <- df_meteofrance %>%
+  left_join(df_meteofrance_bedarieux) %>%
+  mutate(DRR = ifelse(nom_commune == "MURVIEL-LES-MONTPELLIER" & is.na(DRR), DRR2, DRR)) %>%
+  mutate(FFM = ifelse(nom_commune == "MURVIEL-LES-MONTPELLIER" & is.na(FFM), FFM2, FFM)) %>%
+  mutate(FXY = ifelse(nom_commune == "MURVIEL-LES-MONTPELLIER" & is.na(FXY), FXY2, FXY)) %>%
+  mutate(UM = ifelse(nom_commune == "MURVIEL-LES-MONTPELLIER" & is.na(UM), UM2, UM)) %>%
+  dplyr::select(-c("DRR2","FFM2","FXY2","UM2")) %>%
+  dplyr::filter(nom_commune!="BEDARIEUX")
+
+
+df_meteofrance_2022_2024 <- df_meteofrance %>% filter(date>="2022-01-01")
+write.csv(df_meteofrance_2022_2024,file.path("data","processed","data_meteofrance_2022_2024.csv"), row.names = F)
+
+df_meteofrance_historique <- df_meteofrance %>% filter(date<"2022-01-01")
+write.csv(df_meteofrance_historique,file.path("data","processed","data_meteofrance_historique.csv"), row.names = F)
+
+
+
+## préparation des données synop:
+
 # df_meteofrance_2023_2024 <- list.files("data_meteofrance", full.names = T, pattern = "synop") %>%
 #   future_map_dfr(.,~read_delim(., delim = ";", na = "mq",show_col_types = FALSE)) %>%
 #   filter(numer_sta == "07643") %>%
@@ -31,33 +78,6 @@
 #
 
 
-df_meteofrance_RR_T_Vent <- list.files(file.path("data","raw","meteofrance"), full.names = T, pattern = "RR-T-Vent.csv.gz") %>%
-  purrr::map_dfr(.,~read_delim(., delim = ";", show_col_types = FALSE, na = "")) %>%
-  filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD","BORDEAUX-MERIGNAC","BIARRITZ-PAYS-BASQUE"))
-
-df_meteofrance_autres_parametres <- list.files(file.path("data","raw","meteofrance"), full.names = T, pattern = "autres_parametres.csv.gz") %>%
-  purrr::map_dfr(.,~read_delim(., delim = ";", show_col_types = FALSE, na = "")) %>%
-  filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD","BORDEAUX-MERIGNAC","BIARRITZ-PAYS-BASQUE"))
-
-df_meteofrance <- df_meteofrance_RR_T_Vent %>%
-  left_join(df_meteofrance_autres_parametres) %>%
-  mutate(date = parse_date_time(AAAAMMJJ,"ymd")) %>%
-  dplyr::select( NOM_USUEL , date, RR, DRR, TM, TN, TX, TAMPLI, FFM, FXY, UM) %>%
-  rename(nom_commune = NOM_USUEL) %>%
-  mutate(nom_commune = case_when(nom_commune=="MONTPELLIER-AEROPORT" ~ "PEROLS",
-                                 nom_commune=="MONTARNAUD" ~ "MURVIEL-LES-MONTPELLIER",
-                                 nom_commune=="BORDEAUX-MERIGNAC" ~ "SAINT-MEDARD-EN-JALLES",
-                                 nom_commune=="BIARRITZ-PAYS-BASQUE" ~ "BAYONNE"))
-
-df_meteofrance_2023_2024 <- df_meteofrance %>% filter(date>="2023-01-01")
-write.csv(df_meteofrance_2023_2024,file.path("data","processed","data_meteofrance_2023_2024.csv"), row.names = F)
-
-df_meteofrance_historique <- df_meteofrance %>% filter(date<"2023-01-01")
-write.csv(df_meteofrance_historique,file.path("data","processed","data_meteofrance_historique.csv"), row.names = F)
-
-
-
-
 
 
 #
@@ -71,10 +91,6 @@ write.csv(df_meteofrance_historique,file.path("data","processed","data_meteofran
 #   filter(RR == 0) %>%
 #   group_by(NOM_USUEL,date,year,month,week, sequence) %>%
 #   summarise(RFNO = n())
-#
-#
-# df_meteofrance_2023_2024 <-
-#
 #
 #
 # summarise(RFD = sum(RR, na.rm = T),
