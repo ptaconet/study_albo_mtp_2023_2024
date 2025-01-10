@@ -5,13 +5,14 @@ library(sf)
 # ## Import and prepare dataset of mosquito collection
 
 # Data altopictus
-df <- read_excel("piege_data.xlsx") %>%
-  filter(!is.na(date_releve_jour), !is.na(effectif_jour_PP), statut == "RAS") %>%
-  #mutate(daterec = parse_date_time(date_releve_jour,"d/m/y")) %>%
+df <- read.csv("piege_data.csv") %>%
+  filter(!is.na(date_releve_jour), !is.na(effectif_jour), statut == "RAS") %>%
+  mutate(date_releve_jour = parse_date_time(date_releve_jour,"d/m/y")) %>%
   rename(daterec = date_releve_jour, Latitude = y, Longitude = x, Site = nom_commune, NumPP = num_piege) %>%
   mutate(week = week(daterec), Mois_numeric = month(daterec), Year = year(daterec)) %>%
-  mutate(effectif_jour_PP = as.numeric(effectif_jour_PP)) %>%
-  dplyr::select(daterec, week, Year, Mois_numeric, NumPP, Latitude, Longitude, Site, effectif_jour_PP)
+  mutate(Latitude = gsub(",",".",Latitude), Longitude = gsub(",",".",Longitude), effectif_jour = gsub(",",".",effectif_jour)) %>%
+  mutate(effectif_jour = as.numeric(effectif_jour), Latitude = as.numeric(Latitude),  Longitude = as.numeric(Longitude)) %>%
+  dplyr::select(daterec, week, Year, Mois_numeric, NumPP, Latitude, Longitude, Site, effectif_jour)
 
 # Data Colombine
 loc_pieges_2023 <- read_sf("MTP_P02_TRAPS_LOCATION_2023.gpkg") %>% mutate(ANNEE = 2023) %>% dplyr::select(ID_PIEGE,LATITUDE,LONGITUDE, ANNEE) %>% st_drop_geometry() %>% filter(!is.na(LATITUDE)) %>% mutate(ID_PIEGE = gsub("_","",ID_PIEGE)) %>% rename(ID_PP = ID_PIEGE) %>% mutate(LATITUDE = as.numeric(LATITUDE), LONGITUDE = as.numeric(LONGITUDE))
@@ -28,8 +29,9 @@ df_colombine <- read.csv("MTP_EGGS_ABUNDANCE_2023_2024.csv") %>%
   left_join(loc_pieges) %>%
   mutate(Site = "MONTPELLIER") %>%
   mutate(daterec = lubridate::parse_date_time(paste(ANNEE, SEMAINE, 1, sep="/"),'Y/W/w')) %>%
-  rename(week = SEMAINE, Year = ANNEE, Latitude = LATITUDE, Longitude = LONGITUDE, NumPP = ID_PP, Mois_numeric = MOIS, effectif_jour_PP = NB_OEUFS/7) %>%
-  dplyr::select(daterec, week, Year, Mois_numeric, NumPP, Latitude, Longitude, Site, effectif_jour_PP)
+  mutate(effectif_jour = NB_OEUFS/7) %>%
+  rename(week = SEMAINE, Year = ANNEE, Latitude = LATITUDE, Longitude = LONGITUDE, NumPP = ID_PP, Mois_numeric = MOIS) %>%
+  dplyr::select(daterec, week, Year, Mois_numeric, NumPP, Latitude, Longitude, Site, effectif_jour)
 
 # Bind data altopictus and Montpellier
 df_pieges <- df %>%

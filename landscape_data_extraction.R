@@ -91,3 +91,108 @@ q1 <- add_osm_feature(q,key = 'building')
 batiments <- osmdata_sf(q1) %>% trim_osmdata(bb)
 
 ggplot() + geom_sf(data = batiments$osm_polygons) + geom_sf(data = highway$osm_lines) + geom_sf(data = leisure$osm_polygons, fill = "lightblue")  + geom_sf(data = df_sf %>% filter(Site=="PEROLS")) + theme_bw()
+
+
+
+
+
+### ### ### ### ### ### ### ###
+### Variables paysagères, issues d'OSM
+### ### ### ### ### ### ### ###
+
+# OSM data with package osmdata
+# see tuto at : https://cran.r-project.org/web/packages/osmdata/vignettes/osmdata.html
+
+library(osmdata)
+library(terra)
+library(sf)
+
+# available_features()
+keys = c("landuse","leisure","highway","building")
+
+fun_get_osm_data <- function(nom_site,name_key){
+
+  bb <- c(left = min(pieges_data$Longitude[which(pieges_data$site == nom_site)])-0.002, bottom = min(pieges_data$Latitude[which(pieges_data$site == nom_site)])-0.002, right = max(pieges_data$Longitude[which(pieges_data$site == nom_site)])+0.002, top = max(pieges_data$Latitude[which(pieges_data$site == nom_site)])+0.002)
+  #bb <- getbb(nom_site)
+  q <- opq(bbox = bb)
+
+  q1 <- add_osm_feature(q, key = name_key)
+  osm_data <- osmdata_sf(q1)
+
+  return(osm_data)
+}
+
+
+fun_distance_to_nearest_feat <- function(sf_pieges,sf_osm,col_filter,feature_in_osm){
+
+  sf_pieges <- st_transform(sf_pieges,terra::crs(sf_osm))
+
+  sf_osm[as.data.frame(sf_osm)[,col_filter] == feature_in_osm,]
+
+  nearest <- st_nearest_feature(sf_pieges,sf_osm)
+  dist <- st_distance(sf_pieges, sf_osm[nearest,], by_element=TRUE) %>% as.numeric()
+  dist <- data.frame(sf_pieges$num_piege,dist)
+  colnames(dist) <- c("num_piege",feature_in_osm)
+  return(dist)
+
+
+}
+
+fun_surface_in_buffer <- function(sf_pieges,sf_osm,feature_in_osm,buffer){
+
+
+}
+
+fun_intersect <- function(sf_pieges,sf_osm,feature_in_osm){  # feature_in_osm = column in osm data that we want to keep
+
+  sf_pieges <- st_transform(sf_pieges,terra::crs(sf_osm))
+
+  df_intersect <- sf::st_intersection(sf_pieges,sf_osm) %>%
+    dplyr::select(num_piege,!!feature_in_osm) %>%
+    st_drop_geometry()
+
+  return(df_intersect)
+
+}
+
+osm_data <- expand.grid(keys,sites) %>%
+  rename(key = Var1, site = Var2) %>%
+  mutate(osm_data = purrr::map2(site,key, ~fun_get_osm_data(.x,.y)))
+
+pieges_location_nest <- pieges_location %>%
+  group_by(site) %>%
+  tidyr::nest(coords=c(Latitude,Longitude,num_piege)) %>%
+  mutate(sf_points=map(coords,~sf::st_as_sf(.,coords = c("Longitude", "Latitude"), crs = 4326))) %>%
+  dplyr::select(-coords)
+
+pieges_location_osm <- pieges_location_nest %>%
+  left_join(osm_data, by = "site")
+
+
+## landuse
+var_landuse <- pieges_location_osm %>%
+  filter(key=="landuse") %>%
+  mutate(landuse = map2(sf_points,osm_data, ~fun_intersect(.x,.y$osm_polygons,"landuse")))
+
+var_landuse <- list_rbind(var_landuse$landuse) %>%
+  filter(!is.na(landuse)) %>%
+  group_by(num_piege) %>%
+  filter(row_number()==1)
+
+## leisure
+
+var_leisure <- pieges_location_osm %>%
+  filter(key=="leisure") %>%
+  mutate(landuse = map2(sf_points,osm_data, ~fun_distance_to_nearest_feat(.x,.y$osm_polygons,"leisure","swimming_pool")))
+
+
+#ggplot() + geom_sf(data = batiments$osm_polygons) + geom_sf(data = highway$osm_lines) + geom_sf(data = leisure$osm_polygons, fill = "lightblue")  + geom_sf(data = df_sf %>% filter(Site=="PEROLS")) + theme_bw()
+
+
+
+
+df_model <- pieges_data %>%
+  dplyr::select(idpointdecapture , site, num_piege, Latitude, Longitude , date_releve, effectif_jour_PP ) %>%
+  left_join(df_meteo_pieges_summ_wide_meteofrance, by = "idpointdecapture")
+
+write.csv(df_model, "df_model.csv", row.names = F)

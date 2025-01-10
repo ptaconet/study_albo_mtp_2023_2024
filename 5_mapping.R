@@ -61,23 +61,24 @@ df <- df %>%
 
 ### Mapping
 
-# # Import cartographic data
-# bbox_bayonne <- c(left = min(df$Longitude[which(df$Site == "BAYONNE")])-0.001, bottom = min(df$Latitude[which(df$Site == "BAYONNE")])-0.001, right = max(df$Longitude[which(df$Site == "BAYONNE")])+0.001, top = max(df$Latitude[which(df$Site == "BAYONNE")])+0.001)
-# bbox_perols <- c(left = min(df$Longitude[which(df$Site == "PEROLS")])-0.002, bottom = min(df$Latitude[which(df$Site == "PEROLS")])-0.002, right = max(df$Longitude[which(df$Site == "PEROLS")])+0.002, top = max(df$Latitude[which(df$Site == "PEROLS")])+0.002)
-# bbox_stmedard <- c(left = min(df$Longitude[which(df$Site == "SAINT-MEDARD-EN-JALLES")])-0.002, bottom = min(df$Latitude[which(df$Site == "SAINT-MEDARD-EN-JALLES")])-0.002, right = max(df$Longitude[which(df$Site == "SAINT-MEDARD-EN-JALLES")])+0.002, top = max(df$Latitude[which(df$Site == "SAINT-MEDARD-EN-JALLES")])+0.002)
-# bbox_murviel <- c(left = min(df$Longitude[which(df$Site == "MURVIEL-LES-MONTPELLIER")])-0.002, bottom = min(df$Latitude[which(df$Site == "MURVIEL-LES-MONTPELLIER")])-0.002, right = max(df$Longitude[which(df$Site == "MURVIEL-LES-MONTPELLIER")])+0.002, top = max(df$Latitude[which(df$Site == "MURVIEL-LES-MONTPELLIER")])+0.002)
-# bbox_montpellier <- c(left = min(df$Longitude[which(df$Site == "MONTPELLIER")])-0.002, bottom = min(df$Latitude[which(df$Site == "MONTPELLIER")])-0.002, right = max(df$Longitude[which(df$Site == "MONTPELLIER")])+0.002, top = max(df$Latitude[which(df$Site == "MONTPELLIER")])+0.002)
-# bbox_allsites <- c(left = min(df$Longitude)-1, bottom = min(df$Latitude)-1, right = max(df$Longitude)+1, top = max(df$Latitude)+1)
-#
-# ggmap::register_stadiamaps("MY API KEY", write = FALSE)
-#
-# map_bayonne <- get_stadiamap(bbox_bayonne, maptype = "stamen_terrain", zoom = 16)
-# map_perols <- get_stadiamap(bbox_perols, maptype = "stamen_terrain", zoom = 16)
-# map_stmedard <- get_stadiamap(bbox_stmedard, maptype = "stamen_terrain", zoom = 16)
-# map_murviel <- get_stadiamap(bbox_murviel, maptype = "stamen_terrain", zoom = 16)
-# map_montpellier <- get_stadiamap(bbox_montpellier, maptype = "stamen_terrain", zoom = 14)
-# map_allsites <- get_stadiamap(bbox_allsites, maptype = "stamen_terrain", zoom = 8)
-#
+# Import cartographic data
+bbox_bayonne <- c(left = min(df$Longitude[which(df$Site == "BAYONNE")])-0.001, bottom = min(df$Latitude[which(df$Site == "BAYONNE")])-0.001, right = max(df$Longitude[which(df$Site == "BAYONNE")])+0.001, top = max(df$Latitude[which(df$Site == "BAYONNE")])+0.001)
+bbox_perols <- c(left = min(df$Longitude[which(df$Site == "PEROLS")])-0.002, bottom = min(df$Latitude[which(df$Site == "PEROLS")])-0.002, right = max(df$Longitude[which(df$Site == "PEROLS")])+0.002, top = max(df$Latitude[which(df$Site == "PEROLS")])+0.002)
+bbox_stmedard <- c(left = min(df$Longitude[which(df$Site == "SAINT-MEDARD-EN-JALLES")])-0.002, bottom = min(df$Latitude[which(df$Site == "SAINT-MEDARD-EN-JALLES")])-0.002, right = max(df$Longitude[which(df$Site == "SAINT-MEDARD-EN-JALLES")])+0.002, top = max(df$Latitude[which(df$Site == "SAINT-MEDARD-EN-JALLES")])+0.002)
+bbox_murviel <- c(left = min(df$Longitude[which(df$Site == "MURVIEL-LES-MONTPELLIER")])-0.002, bottom = min(df$Latitude[which(df$Site == "MURVIEL-LES-MONTPELLIER")])-0.002, right = max(df$Longitude[which(df$Site == "MURVIEL-LES-MONTPELLIER")])+0.002, top = max(df$Latitude[which(df$Site == "MURVIEL-LES-MONTPELLIER")])+0.002)
+bbox_montpellier <- c(left = min(df$Longitude[which(df$Site == "MONTPELLIER")])-0.002, bottom = min(df$Latitude[which(df$Site == "MONTPELLIER")])-0.002, right = max(df$Longitude[which(df$Site == "MONTPELLIER")])+0.002, top = max(df$Latitude[which(df$Site == "MONTPELLIER")])+0.002)
+bbox_allsites <- c(left = min(df$Longitude)-1, bottom = min(df$Latitude)-1, right = max(df$Longitude)+1, top = max(df$Latitude)+1)
+
+#ggmap::register_stadiamaps("MY API KEY", write = FALSE)
+ggmap::register_stadiamaps("46e02592-4347-4401-95bb-66873ec3a35b")
+
+map_bayonne <- get_stadiamap(bbox_bayonne, maptype = "stamen_terrain", zoom = 16)
+map_perols <- get_stadiamap(bbox_perols, maptype = "stamen_terrain", zoom = 16)
+map_stmedard <- get_stadiamap(bbox_stmedard, maptype = "stamen_terrain", zoom = 16)
+map_murviel <- get_stadiamap(bbox_murviel, maptype = "stamen_terrain", zoom = 16)
+map_montpellier <- get_stadiamap(bbox_montpellier, maptype = "stamen_terrain", zoom = 14)
+map_allsites <- get_stadiamap(bbox_allsites, maptype = "stamen_terrain", zoom = 8)
+
 
 
 ## Plot the location of the traps
@@ -474,8 +475,8 @@ fun_get_map <- function(df, site, temporal_grouping_column, map_type, spat_res =
 
       th_map<- ggmap(map) +
         geom_tile(data = r,  aes(x = x, y = y, fill = layer),  alpha = 0.8, size = 0.02) +
-        scale_fill_gradient(low="lightyellow", high="red", limits = c(0,max(df2$effectif_jour_PP_mn))) +
-        geom_point(data = df2,aes(x = Longitude, y = Latitude), color = "red", size = 0.02) +
+        scale_fill_gradient(low="yellow", high="red", limits = c(0,max(df2$effectif_jour_PP_mn))) +
+        geom_point(data = df2,aes(x = Longitude, y = Latitude), color = "black", size = 0.05) +
         ggtitle(unique_times[i])
 
       maps[[i]] <- th_map

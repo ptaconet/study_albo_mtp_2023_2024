@@ -3,16 +3,16 @@ library(httr)
 
 ## Source : https://www.data.gouv.fr/fr/datasets/donnees-climatologiques-de-base-quotidiennes/#/resources
 
-liste_departements <- c(33,34,64)
+liste_departements <- c(33,34,35,64)
 
 for(i in 1:length(liste_departements)){
 # données 2023-2024
-httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_latest-2023-2024_RR-T-Vent.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_2023_2024_RR-T-Vent.csv.gz"))),httr::progress(),config = list(maxredirs=-1))
-httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_latest-2023-2024_autres-parametres.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_2023_2024_autres_parametres.csv.gz"))),httr::progress(),config = list(maxredirs=-1))
+httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_latest-2024-2025_RR-T-Vent.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_2024_2025_RR-T-Vent.csv.gz")), overwrite = T),httr::progress(),config = list(maxredirs=-1))
+httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_latest-2024-2025_autres-parametres.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_2024_2025_autres_parametres.csv.gz")), overwrite = T),httr::progress(),config = list(maxredirs=-1))
 
 # donnees historiques
-httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_previous-1950-2022_RR-T-Vent.csv.gz"),httr::write_disk(file.path("data","meteofrance",paste0("dpt_",liste_departements[i],"_historique_RR-T-Vent.csv.gz"))),httr::progress(),config = list(maxredirs=-1))
-httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_previous-1950-2022_autres-parametres.csv.gz"),httr::write_disk(file.path("data","meteofrance",paste0("dpt_",liste_departements[i],"_historique_autres_parametres.csv.gz"))),httr::progress(),config = list(maxredirs=-1))
+httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_previous-1950-2023_RR-T-Vent.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_historique_RR-T-Vent.csv.gz")), overwrite = T),httr::progress(),config = list(maxredirs=-1))
+httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_previous-1950-2023_autres-parametres.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_historique_autres_parametres.csv.gz")), overwrite = T),httr::progress(),config = list(maxredirs=-1))
 
 }
 

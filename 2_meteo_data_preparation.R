@@ -2,16 +2,18 @@ library(tidyverse)
 
 
 df_meteofrance_RR_T_Vent <- list.files(file.path("data","raw","meteofrance"), full.names = T, pattern = "RR-T-Vent.csv.gz") %>%
-  purrr::map_dfr(.,~read_delim(., delim = ";", show_col_types = FALSE, na = "")) %>%
-  filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD","BORDEAUX-MERIGNAC","BIARRITZ-PAYS-BASQUE","BEDARIEUX"))
+  purrr::map_dfr(.,~read_delim(., delim = ";", show_col_types = FALSE, na = "", col_select = c(NOM_USUEL , AAAAMMJJ, RR, DRR, TM, TN, TX, TAMPLI, FFM, FXY))) %>%
+  filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD","BORDEAUX-MERIGNAC","BIARRITZ-PAYS-BASQUE","BEDARIEUX","RENNES-ST JACQUES")) %>%
+  dplyr::slice(1, .by = c(NOM_USUEL, AAAAMMJJ))
 
 df_meteofrance_autres_parametres <- list.files(file.path("data","raw","meteofrance"), full.names = T, pattern = "autres_parametres.csv.gz") %>%
-  purrr::map_dfr(.,~read_delim(., delim = ";", show_col_types = FALSE, na = "")) %>%
-  filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD","BORDEAUX-MERIGNAC","BIARRITZ-PAYS-BASQUE","BEDARIEUX"))
+  purrr::map_dfr(.,~read_delim(., delim = ";", show_col_types = FALSE, na = "", col_select = c(NOM_USUEL , AAAAMMJJ,UM))) %>%
+  filter(NOM_USUEL %in% c("MONTPELLIER-AEROPORT","MONTARNAUD","BORDEAUX-MERIGNAC","BIARRITZ-PAYS-BASQUE","BEDARIEUX","RENNES-ST JACQUES")) %>%
+  dplyr::slice(1, .by = c(NOM_USUEL, AAAAMMJJ))
 
 df_meteofrance <- df_meteofrance_RR_T_Vent %>%
-  left_join(df_meteofrance_autres_parametres) %>%
-  mutate(date = parse_date_time(AAAAMMJJ,"ymd")) %>%
+  dplyr::left_join(df_meteofrance_autres_parametres) %>%
+  mutate(date = parse_date_time(as.character(AAAAMMJJ),"ymd")) %>%
   dplyr::select( NOM_USUEL , date, RR, DRR, TM, TN, TX, TAMPLI, FFM, FXY, UM) %>%
   mutate(DRR = DRR/60) %>% # passer les minutes en heures
   rename(nom_commune = NOM_USUEL) %>%
@@ -19,7 +21,8 @@ df_meteofrance <- df_meteofrance_RR_T_Vent %>%
                                  nom_commune=="MONTARNAUD" ~ "MURVIEL-LES-MONTPELLIER",
                                  nom_commune=="BORDEAUX-MERIGNAC" ~ "SAINT-MEDARD-EN-JALLES",
                                  nom_commune=="BIARRITZ-PAYS-BASQUE" ~ "BAYONNE",
-                                 nom_commune=="BEDARIEUX" ~ "BEDARIEUX"))
+                                 nom_commune=="BEDARIEUX" ~ "BEDARIEUX",
+                                 nom_commune=="RENNES-ST JACQUES" ~ "RENNES"))
 
 # on comble les trous pour MURVIEL (DRR, FFM, FMX, UM) avec les données de BEDARIEUX (station la plus proche) puis on enleve bedarieux
 df_meteofrance_bedarieux <- df_meteofrance %>%
@@ -35,14 +38,34 @@ df_meteofrance <- df_meteofrance %>%
   mutate(FXY = ifelse(nom_commune == "MURVIEL-LES-MONTPELLIER" & is.na(FXY), FXY2, FXY)) %>%
   mutate(UM = ifelse(nom_commune == "MURVIEL-LES-MONTPELLIER" & is.na(UM), UM2, UM)) %>%
   dplyr::select(-c("DRR2","FFM2","FXY2","UM2")) %>%
-  dplyr::filter(nom_commune!="BEDARIEUX")
+  dplyr::filter(nom_commune!="BEDARIEUX") %>%
+  mutate(RR = ifelse(is.na(RR),0,RR))
 
 
-df_meteofrance_2022_2024 <- df_meteofrance %>% filter(date>="2022-01-01")
+
+## number of consecutive days without rain (last N days)
+df_meteofrance <- arrange(df_meteofrance, nom_commune,date)
+
+df_meteofrance$RFNO <- 0
+
+for (i in 2:nrow(df_meteofrance)) {
+  if (df_meteofrance$RR[i - 1] == 0) {
+    df_meteofrance$RFNO[i] <- df_meteofrance$RFNO[i - 1] + 1
+  } else {
+    df_meteofrance$RFNO[i] <- 0
+  }
+}
+
+meteo2 <- df_meteofrance %>% filter(nom_commune=="PEROLS") %>% mutate(nom_commune="MONTPELLIER") # pour les données météo sur montpellier, on prend les données de PEROLS
+
+df_meteofrance = bind_rows(df_meteofrance,meteo2)
+
+df_meteofrance_2022_2024 <- df_meteofrance %>% filter(date>="2022-01-01", date <= "2025-01-01")
 write.csv(df_meteofrance_2022_2024,file.path("data","processed","data_meteofrance_2022_2024.csv"), row.names = F)
 
 df_meteofrance_historique <- df_meteofrance %>% filter(date<"2022-01-01")
 write.csv(df_meteofrance_historique,file.path("data","processed","data_meteofrance_historique.csv"), row.names = F)
+
 
 
 
@@ -82,15 +105,6 @@ write.csv(df_meteofrance_historique,file.path("data","processed","data_meteofran
 
 #
 #
-# # number of consecutive days without rain (last N days)
-# df_meteofrance_2023_2024_RFNO <-  df_meteofrance_2023_2024_RR_T_Vent %>%
-#   left_join(df_meteofrance_2023_2024_autres_parametres) %>%
-#   mutate(date = parse_date_time(AAAAMMJJ,"ymd"), year = year(date), month = month(date), week = week(date)) %>%
-#   group_by(NOM_USUEL,date,year,month,week) %>%
-#   mutate(sequence = data.table::rleid(RR == 0),) %>%
-#   filter(RR == 0) %>%
-#   group_by(NOM_USUEL,date,year,month,week, sequence) %>%
-#   summarise(RFNO = n())
 #
 #
 # summarise(RFD = sum(RR, na.rm = T),
