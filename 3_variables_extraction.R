@@ -1,7 +1,6 @@
 library(tidyverse)
 library(furrr)
 
-
  pieges_data <- read.csv( file.path("data","processed","df_pieges.csv")) %>%
    filter(!is.na(date_releve)) %>%
    mutate(num_releve = seq(1,nrow(.),1)) %>%
@@ -233,15 +232,17 @@ RFNO = pieges_data %>%
 df_meteo_pieges_summ_wide_meteofrance <- df_meteo_pieges_summ_wide_meteofrance %>%
   left_join(RFNO)
 
-# à l"échelle du piege
+
+# à l'échelle du piege
 df_to_model <- pieges_data %>%
   left_join(df_meteo_pieges_summ_wide_meteofrance)
 
-# à l'échelle de la semaine de collecte-ville :
+
+# à l'échelle de la ville-semaine de collecte :
 df_to_model_grouped <- df_to_model %>%
   relocate(effectif_jour,.before = RR_0_0) %>%
   group_by(site, Year,week) %>%
-  summarise_at(vars(effectif_jour:RFNO), mean, na.rm = TRUE)
+  summarise_at(vars(effectif_jour:PHOTOPER), mean, na.rm = TRUE)
 
 
 write.csv(df_to_model,file.path("data","processed","df_to_model.csv"), row.names = F)

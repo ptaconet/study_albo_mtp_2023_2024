@@ -6,7 +6,7 @@ library(httr)
 liste_departements <- c(33,34,35,64)
 
 for(i in 1:length(liste_departements)){
-# données 2023-2024
+# données 2024-2025
 httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_latest-2024-2025_RR-T-Vent.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_2024_2025_RR-T-Vent.csv.gz")), overwrite = T),httr::progress(),config = list(maxredirs=-1))
 httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_",liste_departements[i],"_latest-2024-2025_autres-parametres.csv.gz"),httr::write_disk(file.path("data","raw","meteofrance",paste0("dpt_",liste_departements[i],"_2024_2025_autres_parametres.csv.gz")), overwrite = T),httr::progress(),config = list(maxredirs=-1))
 

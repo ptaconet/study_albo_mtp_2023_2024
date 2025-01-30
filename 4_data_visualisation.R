@@ -236,7 +236,7 @@ df2 <- df_meteofrance2 %>%
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 
 ggplot(df_pieges, aes(x = as.factor(week), group = as.factor(year))) +
-  geom_line(aes(y = scales::rescale(effectif_jour_mean, to=c(0,1)), color = as.factor(year))) +
+  geom_line(aes(y = effectif_jour_mean, color = as.factor(year))) +
   #geom_ribbon(aes(y = effectif_jour_mean, ymin = effectif_jour_mean - effectif_jour_sd, ymax = effectif_jour_mean + effectif_jour_sd, fill =  as.factor(year)), alpha = .05) +
   facet_wrap(.~nom_commune) +
   theme_bw() + # theme_classic()
