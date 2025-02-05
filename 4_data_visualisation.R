@@ -162,7 +162,7 @@ df_pieges <- read.csv( file.path("data","processed","df_pieges.csv")) %>%
   summarise(effectif_jour_mean=mean(effectif_jour, na.rm = T), effectif_jour_sd = sd(effectif_jour, na.rm = T)) %>%
   filter(!is.na(year)) %>%
   mutate(nom_commune = as.factor(nom_commune)) %>%
-  mutate(nom_commune= forcats::fct_relevel(nom_commune, "MONTPELLIER", "MURVIEL-LES-MONTPELLIER", "PEROLS" ,"BAYONNE","SAINT-MEDARD-EN-JALLES","RENNES" ))
+  mutate(nom_commune= forcats::fct_relevel(nom_commune, "MURVIEL-LES-MONTPELLIER", "PEROLS" ,"BAYONNE","SAINT-MEDARD-EN-JALLES","RENNES" ))
 
 
 ## Données météo
@@ -227,6 +227,7 @@ df_meteofrance2 <- df_meteofrance %>%
 
 
 df2 <- df_meteofrance2 %>%
+  filter(!(nom_commune=="MONTPELLIER")) %>%
   left_join(df_pieges2) %>%
   pivot_longer(!c(nom_commune,week)) %>%
   filter(!is.na(value))

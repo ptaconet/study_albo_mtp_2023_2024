@@ -19,6 +19,14 @@ model_abundance <- multiv_model_abundance[[1]] #### sum up of abundance model
 df_cv_abundance <- multiv_model_abundance[[2]] #### data frame with prediction
 df_mod_abundance <- multiv_model_abundance[[3]] #### data frame which was used to build the model
 
+# data andrea
+load("table_Metelmann.RData")
+df_cv_presence_andrea <- presence_tot_df %>% mutate(pred_final = ifelse(pred_final==0, "Absence","Presence")) %>% rename(Year = year, pred_andrea = pred_final) %>% mutate(Year = as.numeric(as.character(Year))) %>% mutate(site = ifelse(site=="MONTPELLIER CENTRE","MONTPELLIER",site)) %>% dplyr::select(-c("obs","pred"))
+df_cv_abundance_andrea <- abundance_tot_df
+
+
+df_cv_presence_twomodels <- df_cv_presence %>%
+  left_join(df_cv_presence_andrea, by = c("site","week", "Year"))
 
 ###########################
 #########'Presence model
@@ -32,26 +40,6 @@ df_mod_abundance <- multiv_model_abundance[[3]] #### data frame which was used t
 #### First step: Model evaluation plots
 
 ## With only site cross validation: plot with observation and prediction for the different site, trap and numero session
-plot_eval_presence_model <- df_cv_presence %>%
-  as_tibble() %>%
-  pivot_longer(c('pred','obs')) %>%
-  mutate(name = ifelse(name=="pred","Predicted","Observed")) %>%
-  mutate(value = case_when(pred_final=="Presence" & name == "Predicted" ~ 1,
-                           pred_final=="Absence" & name == "Predicted" ~ 0,
-                           name == "Observed" ~ value)) %>%
-  mutate(date = as.Date(paste(Year, week, 1, sep="-"), "%Y-%U-%u")) %>%
-  ggplot(aes(x=date, y = value, color = name, group = name)) +
-  geom_point() +
-  geom_line() +
-  facet_wrap(.~site) +
-  theme_bw() +
-  xlab("entomological survey") +
-  ylab("∑ Presence probability") +
-  labs(color='Probability of presence of Ae. Albopictus') +
-  theme(legend.position="bottom") +
-  ggtitle('Presence models : observed vs. predicted values')
-
-
 
  df_cv_presence %>%
   as_tibble() %>%
@@ -68,7 +56,18 @@ plot_eval_presence_model <- df_cv_presence %>%
    scale_x_continuous(limits = c(1,52)) +
    theme_light()
 
-
+ df_cv_presence_twomodels %>% mutate(obs = ifelse(obs == 1, "Presence","Absence")) %>%
+   as_tibble() %>%
+   pivot_longer(c('pred_final','pred_andrea','obs')) %>%
+   mutate(name = case_when(name=="pred_final" ~ "Predicted ML",
+                           name=="obs" ~ "Observed",
+                           name=="pred_andrea" ~ "Predicted Metelmann")) %>%
+   mutate(name = fct_relevel(name,c("Predicted ML","Predicted Metelmann","Observed"))) %>%
+   ggplot(aes(x=week, y=name, fill = value,width=1, height=1)) +
+   geom_tile( size=0.5, colour = "grey50") +
+   facet_grid(site~Year) +
+   scale_x_continuous(limits = c(1,52)) +
+   theme_light()
 
 
 ggsave(filename = "02_Data/processed_data/plots/modelling_adults_abundance/test/test_Article/presence_evaluation.pdf",plot =plot_eval_presence_model, device = "pdf", width = 11, height = 8)

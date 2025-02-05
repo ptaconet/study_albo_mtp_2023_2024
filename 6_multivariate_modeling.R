@@ -8,13 +8,21 @@ library(correlation) ## Version ‘0.8.5’
 
 ########################### Open dataset containing the dependant and independent variables
 
-df_model <- read.csv(file.path("data","processed","df_to_model_grouped.csv"))
+df_model <- read.csv(file.path("data","processed","df_to_model.csv"))
+
+# grouper à l'échelle de la ville-semaine de collecte :
+df_model <- df_model %>%
+  relocate(effectif_jour,.before = RR_0_0) %>%
+  group_by(site, Year,week) %>%
+  summarise_at(vars(effectif_jour:RFNO), mean, na.rm = TRUE) %>%
+  ungroup()
+
 
 df_model <- df_model %>%
   rename(NB_ALBO_TOT = effectif_jour) %>%
   mutate(PRES_ALBO = ifelse(NB_ALBO_TOT>0,"Presence","Absence")) %>% ## to create a "character" variable for presence or absence of Aedes albopictus
   mutate(PRES_ALBO = fct_relevel(PRES_ALBO,c("Presence","Absence"))) %>%
-  mutate(PRES_ALBO_NUMERIC = ifelse(NB_ALBO_TOT>0,1,0)) %>% ## to create a numeric variable for presence or absence of Aedes albopictus
+  mutate(PRES_ALBO_NUMERIC = ifelse(PRES_ALBO=="Presence",1,0)) %>% ## to create a numeric variable for presence or absence of Aedes albopictus
   filter(!is.na(NB_ALBO_TOT))
 
 ###########################
@@ -31,7 +39,7 @@ predictors_presence <- c("TM_0_8","TN_0_8","TX_0_8","TAMPLI_0_8","UM_0_8","RR_0_
 ##### Plot the bivariate relationship between presence and each selected predictor
 p_pres <- df_model %>%
   dplyr::select(PRES_ALBO_NUMERIC,predictors_presence) %>%
-  pivot_longer(-PRES_ALBO_NUMERIC) %>%
+  pivot_longer(PRES_ALBO_NUMERIC) %>%
   ggplot(aes(y = PRES_ALBO_NUMERIC, x = value)) +
   geom_point() +
   ylim(c(0,1)) +

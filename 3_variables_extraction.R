@@ -238,12 +238,5 @@ df_to_model <- pieges_data %>%
   left_join(df_meteo_pieges_summ_wide_meteofrance)
 
 
-# à l'échelle de la ville-semaine de collecte :
-df_to_model_grouped <- df_to_model %>%
-  relocate(effectif_jour,.before = RR_0_0) %>%
-  group_by(site, Year,week) %>%
-  summarise_at(vars(effectif_jour:PHOTOPER), mean, na.rm = TRUE)
-
 
 write.csv(df_to_model,file.path("data","processed","df_to_model.csv"), row.names = F)
-write.csv(df_to_model_grouped,file.path("data","processed","df_to_model_grouped.csv"), row.names = F)
