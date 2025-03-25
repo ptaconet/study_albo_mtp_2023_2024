@@ -34,30 +34,7 @@ df_model <- df_model %>%
 
 
 ##### First step: to select variables for presence models
-predictors_presence <- c("TM_0_8","TN_0_8","TX_0_8","TAMPLI_0_8","UM_0_8","RR_0_8","RRMAX_0_8","DRR_0_8","FFM_0_8","FXY_0_8")
-
-##### Plot the bivariate relationship between presence and each selected predictor
-p_pres <- df_model %>%
-  dplyr::select(PRES_ALBO_NUMERIC,predictors_presence) %>%
-  pivot_longer(PRES_ALBO_NUMERIC) %>%
-  ggplot(aes(y = PRES_ALBO_NUMERIC, x = value)) +
-  geom_point() +
-  ylim(c(0,1)) +
-  geom_smooth() +
-  facet_wrap(.~name, scales = "free") +
-  theme_bw() +
-  ggtitle("Presence albo eggs ~ selected variables")
-
-#ggsave("02_Data/processed_data/plots/modelling_adults_abundance/plot_presence_vs_selected_vars_poll.png",p_pres,width = 9.65, height = 6.42, units = "in") ## to save
-
-##### Second step: identify correlated variables that are greater than 0.7 (Pearson correlation coefficient)
-m <- cor(df_model[,predictors_presence], method = "pearson", use = "pairwise.complete.obs")
-index <- which(abs(m) > .7 & abs(m) < 1,arr.ind = T)
-df_cor <- subset(as.data.frame(index) , row <= col)
-p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_cor[,2]])
-
-## Final variables selections
-predictors_presence <- c("TM_0_8","TAMPLI_0_8","UM_0_8","RR_0_8","FFM_0_8")
+predictors_presence<- c("TM_3_8","TN_3_8","TX_3_8","UM_3_8","RR_3_8","DRR_3_8","FFM_3_8")
 
 #### Final data frame for the multivariate analysis
 df_model_presence <- df_model %>%
@@ -73,56 +50,20 @@ df_model_presence <- df_model %>%
 ###########################
 
 ##### First step: select variables for abundance models
-predictors_abundance <- c("TM_0_4","TN_0_4","TX_0_4","TAMPLI_0_4","UM_0_4","RR_0_4","RRMAX_0_4","DRR_0_4","FFM_0_4","FXY_0_4")
-
-
-df_model_abundance <- df_model %>%
-  filter(NB_ALBO_TOT>0) %>%
-  dplyr::select("site","Year", "week" ,  "NB_ALBO_TOT", "PRES_ALBO", predictors_abundance)
-
-#####  Plot the bivariate relationship between abundance and each selected predictor
-p_ab <- df_model_abundance %>%
-  dplyr::select(NB_ALBO_TOT,predictors_abundance) %>%
-  pivot_longer(-NB_ALBO_TOT) %>%
-  ggplot(aes(y = NB_ALBO_TOT, x = value)) +
-  geom_point() +
-  geom_smooth() +
-  ylim(c(0,80)) +
-  facet_wrap(.~name, scales = "free_x") +
-  theme_bw() +
-  ggtitle("Abondance albo ~ variables séléctionnées")
-
-#ggsave("02_Data/processed_data/plots/modelling_adults_abundance/plot_abundance_vs_selected_vars_poll.png",p_ab,width = 9.65, height = 7.42, units = "in") ## to save
-
-##### Second step: identify correlated variables that are greater than 0.7 (Pearson correlation coefficient)
-m <- cor(df_model_abundance[,predictors_abundance], method = "pearson", use = "pairwise.complete.obs")
-index <- which(abs(m) > .7 & abs(m) < 1,arr.ind = T)
-df_cor <- subset(as.data.frame(index) , row <= col)
-p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_cor[,2]])
-
-
-## Final variables selections
-predictors_abundance <- c("TM_0_4","TAMPLI_0_4","UM_0_4","RR_0_4","FFM_0_4")
-
+predictors_abundance <- c("TM_3_8","TN_3_8","TX_3_8","UM_3_8","RR_3_8","DRR_3_8","FFM_3_8")
 
 #### Final data frame for the multivariate analysis
 df_model_abundance <- df_model %>%
   filter(NB_ALBO_TOT>0) %>%
   dplyr::select("site","Year", "week" ,  "NB_ALBO_TOT", "PRES_ALBO", predictors_abundance)
 
+df_model_abundance$NB_ALBO_TOT <- log(df_model_abundance$NB_ALBO_TOT)
 
 
-###########################
-#########'Second stage of analysis: multivariate anaylsis using a leave-one-site-out cross validation and a leave-one-session-out cross validation (but juste to valdiate and evaluate the model)
-#########' For presence models
-###########################
-
-predictors_presence <- c(predictors_presence,"site")
-predictors_abundance <- c(predictors_abundance,"site")
+## leave location out
 
 #### First step: to parameter the model: leave-one-site-out cross validation
-cv_col <- "Year"
-
+cv_col <- "site"
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 
@@ -140,7 +81,7 @@ tr = trainControl(method="cv", ## Definition of method sampling: cross validatio
 
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the ROC
-mod_presence <- caret::train(x = df_model_presence[,predictors_presence], y = df_model_presence$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
+mod_presence <- CAST::ffs(predictors = df_model_presence[,predictors_presence], response = df_model_presence$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"))
 
 
 #### Last step: to put predictions on same data frame
@@ -152,15 +93,12 @@ df_cv_presence <- mod_presence$pred %>%
   dplyr::rename(pred_final = pred, pred = Presence)
 
 res_multiv_model_presence <- list(model = mod_presence, df_cv = df_cv_presence, df_mod = df_model_presence) ## to save models, data frame of the model and predictions
-saveRDS(res_multiv_model_presence,"res_multiv_model_presence.rds")
+saveRDS(res_multiv_model_presence,"res_multiv_model_presence_forecasting_llo.rds")
 
 ##############
 #####" abundance
 #############
 
-df_model_abundance$NB_ALBO_TOT <- log(df_model_abundance$NB_ALBO_TOT)
-
-cv_col <- "Year"
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance, spacevar = cv_col,k = length(unique(unlist(df_model_abundance[,cv_col]))))
@@ -173,7 +111,7 @@ tr = trainControl(method="cv",
 
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE
-mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
+mod_abundance <- CAST::ffs(predictors = df_model_abundance[,predictors_abundance], response = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"))
 
 #### Last step: to put predictions on same data frame
 df_model_abundance$rowIndex <- seq(1,nrow(df_model_abundance),1)
@@ -182,5 +120,7 @@ df_cv_abundance <- mod_abundance$pred %>%
   dplyr::select(pred,obs,site,week,Year)
 
 res_multiv_model_abundance <- list(model = mod_abundance, df_cv = df_cv_abundance, df_mod = df_model_abundance) ## to save models, data frame of the model and predictions
-saveRDS(res_multiv_model_abundance,"res_multiv_model_abundance.rds")
+saveRDS(res_multiv_model_abundance,"res_multiv_model_abundance_forecasting_llo.rds")
+
+
 

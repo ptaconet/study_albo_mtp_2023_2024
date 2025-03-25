@@ -1,59 +1,62 @@
 library(tidyverse)
 library(patchwork)
 
-pieges_data <- read.csv("piege_data.csv") %>%
-  filter(!is.na(date_releve_jour), statut == "RAS") %>%
-  mutate(date_releve_jour = parse_date_time(date_releve_jour,"d/m/y"), week = week(date_releve_jour), month = month(date_releve_jour), year = year(date_releve_jour)) %>%
-  filter(dpt == "HERAULT") %>%
+pieges_data <- read.csv( file.path("data","processed","df_pieges.csv")) %>%
+  filter(!is.na(date_releve)) %>%
+  mutate( week = week(date_releve), month = month(date_releve), year = year(date_releve)) %>%
   mutate(effectif_jour = as.numeric(effectif_jour)) %>%
   mutate(year = factor(year, levels = c("2023", "2024")))
 
+# df_meteofrance_historique <- read.csv("data/processed/data_meteofrance_historique.csv") %>%
+#   group_by(year, week) %>%
+#   summarise(RFD = sum(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+#   group_by(week) %>%
+#   summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+#   mutate(RFDcum = cumsum(RFD)) %>%
+#   mutate(year = "moy. 1950-2022")
+#
+#
 
-df_meteofrance_historique <- read.csv("data/processed/data_meteofrance_historique.csv") %>%
-  group_by(year, week) %>%
-  summarise(RFD = sum(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
-  group_by(week) %>%
-  summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
-            #RFD_sd = sd(RFD, na.rm = T), TMN_sd = sd(TMN, na.rm = T), TMIN_sd = sd(TMIN, na.rm = T), TMAX_sd = sd(TMAX, na.rm = T)) %>%
+df_meteofrance_2023_2024 <- read.csv(file.path("data","processed","data_meteofrance_2022_2024.csv")) %>%
+  mutate( week = week(date), month = month(date), year = year(date)) %>%
+  group_by(nom_commune, week, year) %>%
+  summarise(RFD = sum(RR, na.rm = T), TMN = mean(TM, na.rm = T), TN = mean(TMN, na.rm = T), TX = mean(TX, na.rm = T), UM = mean(UM, na.rm = T)) %>%
   mutate(RFDcum = cumsum(RFD)) %>%
-  mutate(year = "moy. 1950-2022")
+  mutate(year = as.character(year)) %>%
+  ungroup() %>%
+  rename(site = nom_commune)
 
 
-df_meteofrance_2023_2024 <-  read.csv("data_meteofrance/data_meteofrance_2023_2024.csv") %>%
-  mutate(date = as.Date(date)) %>%
-  group_by(year, week) %>%
-  summarise(RFD = sum(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
-  mutate(RFDcum = cumsum(RFD)) %>%
-  mutate(year = as.character(year))
+#
+# df_meteofrance_proj <-  read.delim("data_meteofrance/tasmintasmaxtasprtothusssfcwind_France_CNRM-CERFACS-CNRM-CM5_CNRM-ALADIN63_rcp4.5_METEO-FRANCE_ADAMONT-France_SAFRAN_day_20230101-21001231.txt", skip = 64, sep = ",", col.names = c("Date", "Latitude", "Longitude",  "tasminAdjust", "tasmaxAdjust" ,"tasAdjust", "prtotAdjust" ,"hussAdjust", "sfcWindAdjust"),  na.strings = "-999.99") %>%
+#   mutate(date = parse_date_time(Date,"ymd"), week = week(date), year = year(date)) %>%
+#   group_by(year, week) %>%
+#   summarise(RFD = sum(prtotAdjust, na.rm = T)*86400, TMN = mean(tasAdjust, na.rm = T)-273.15, TMIN = mean(tasminAdjust, na.rm = T)-273.15, TMAX = mean(tasmaxAdjust, na.rm = T)-273.15) %>%
+#   group_by(week) %>%
+#   summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
+#   mutate(RFDcum = cumsum(RFD)) %>%
+#   mutate(year = "proj. 2023-2100 (scenario rcp4.5)")
 
 
-df_meteofrance_proj <-  read.delim("data_meteofrance/tasmintasmaxtasprtothusssfcwind_France_CNRM-CERFACS-CNRM-CM5_CNRM-ALADIN63_rcp4.5_METEO-FRANCE_ADAMONT-France_SAFRAN_day_20230101-21001231.txt", skip = 64, sep = ",", col.names = c("Date", "Latitude", "Longitude",  "tasminAdjust", "tasmaxAdjust" ,"tasAdjust", "prtotAdjust" ,"hussAdjust", "sfcWindAdjust"),  na.strings = "-999.99") %>%
-  mutate(date = parse_date_time(Date,"ymd"), week = week(date), year = year(date)) %>%
-  group_by(year, week) %>%
-  summarise(RFD = sum(prtotAdjust, na.rm = T)*86400, TMN = mean(tasAdjust, na.rm = T)-273.15, TMIN = mean(tasminAdjust, na.rm = T)-273.15, TMAX = mean(tasmaxAdjust, na.rm = T)-273.15) %>%
-  group_by(week) %>%
-  summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
-  mutate(RFDcum = cumsum(RFD)) %>%
-  mutate(year = "proj. 2023-2100 (scenario rcp4.5)")
-
-
-df_meteofrance <- rbind(df_meteofrance_historique,df_meteofrance_2023_2024,df_meteofrance_proj) %>%
-  mutate(year = factor(year, levels = c("2023", "2024", "moy. 1950-2022","proj. 2023-2100 (scenario rcp4.5)")))
+# df_meteofrance <- rbind(df_meteofrance_historique,df_meteofrance_2023_2024,df_meteofrance_proj) %>%
+#   mutate(year = factor(year, levels = c("2023", "2024", "moy. 1950-2022","proj. 2023-2100 (scenario rcp4.5)")))
 
 
 cbp1 <-c("#FD9B63", "#E7D37F","#81A263","#B60071")
 
 # précipitations
-scaleFactor1 <- max(df_meteofrance$RFDcum, na.rm = T) / max(pieges_data$effectif_jour_PP, na.rm = T)
+scaleFactor1 <- max(df_meteofrance_2023_2024$RFD, na.rm = T) / max(pieges_data$effectif_jour, na.rm = T)
 
 p1 <- ggplot() +
-  geom_line(aes(x = as.factor(df_meteofrance$week), y = df_meteofrance$RFDcum, colour = as.factor(df_meteofrance$year), group =  as.factor(df_meteofrance$year)), size = 0.5) +
-  geom_boxplot(aes(x = as.factor(pieges_data$week), y = pieges_data$effectif_jour_PP * scaleFactor1, fill = as.factor(pieges_data$year)), outlier.shape = NA, position = position_dodge(preserve = "single"), size = 0.3) +
+  geom_line(aes(x = as.factor(df_meteofrance_2023_2024$week), y = df_meteofrance_2023_2024$RFD, colour = as.factor(df_meteofrance_2023_2024$year), group =  as.factor(df_meteofrance_2023_2024$year)), size = 0.5) +
+  geom_boxplot(aes(x = as.factor(pieges_data$week), y = pieges_data$effectif_jour * scaleFactor1, fill = as.factor(pieges_data$year)), outlier.shape = NA, position = position_dodge(preserve = "single"), size = 0.3) +
   scale_y_continuous(name = "précipitation cumulées (mm)", sec.axis = sec_axis(~./scaleFactor1, name = "effectif jour PP")) +
   scale_fill_manual(values = cbp1, name = "Collectes Oeufs") +
   scale_color_manual(values = cbp1, name = "Facteur météorologique") +
   labs(title="Oeufs albo et précipitation cumulées", x ="Semaine") +
   theme_bw()
+
+ggplot() +
 
 
 # températures
@@ -168,7 +171,7 @@ df_pieges <- read.csv( file.path("data","processed","df_pieges.csv")) %>%
 ## Données météo
 
 df_meteofrance_historique <- read.csv("data/processed/data_meteofrance_historique.csv") %>%
-  mutate(date=as.Date(date), year = year(date), week = week(date)) %>%
+  mutate(date=as.Date(date), year = year(date), week =  week(date)) %>%
   group_by(nom_commune,year, week) %>%
   summarise(RFD = sum(RR, na.rm = T), TMN = mean(TM, na.rm = T), TMIN = mean( TN , na.rm = T), TMAX = mean(TX, na.rm = T)) %>%
   group_by(nom_commune,week) %>%
@@ -179,7 +182,7 @@ df_meteofrance_historique <- read.csv("data/processed/data_meteofrance_historiqu
 
 
 df_meteofrance_2023_2024 <-  read.csv("data/processed/data_meteofrance_2022_2024.csv") %>%
-  mutate(date = as.Date(date), year = year(date), week = week (date)) %>%
+  mutate(date = as.Date(date), year = year(date), week =  week(date)) %>%
   filter(date >= "2023-01-01") %>%
   group_by(nom_commune,year, week) %>%
   summarise(RFD = sum(RR, na.rm = T), TMN = mean(TM, na.rm = T), TMIN = mean( TN , na.rm = T), TMAX = mean(TX, na.rm = T)) %>%
@@ -248,8 +251,8 @@ ggplot(df_pieges, aes(x = as.factor(week), group = as.factor(year))) +
 
 
 ggplot() +
-  geom_line(data = df2 %>% filter(name %in% c("effectif_jour_2023","effectif_jour_2024")), aes(x = week, y = value, group = as.factor(name), color = as.factor(name))) +
-  stat_smooth(data = df2 %>% filter(name %in% c("RFDcum_2024","RFDcum_2023")), aes(x = week, y = value, group = as.factor(name), color = as.factor(name)), method = "gam", se = FALSE, linewidth = 1) +
+  geom_line(data = df2 %>% filter(name %in% c("effectif_jour_2023","effectif_jour_2024","TMN_2024","TMN_2023")), aes(x = week, y = value, group = as.factor(name), color = as.factor(name))) +
+  #stat_smooth(data = df2 %>% filter(name %in% c("RFD_2024","RFD_2023")), aes(x = week, y = value, group = as.factor(name), color = as.factor(name)), method = "gam", se = FALSE, linewidth = 1) +
   facet_wrap(.~nom_commune) +
   theme_bw() +
   theme(panel.grid = element_blank())

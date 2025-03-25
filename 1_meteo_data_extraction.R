@@ -36,3 +36,5 @@ httr::GET(paste0("https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp
 #     fun_extract_meteo_data(months[j],years[i],"data_meteofrance")
 #   }
 # }
+
+## Données DRIAS changement climatique : https://drias-climat.fr/

@@ -7,26 +7,143 @@ library(precrec) ## Version ‘0.14.4’
 
 ########################### Open dataset containing the results of presence and abundance models
 
-#### With site cross validation
-multiv_model_presence <- readRDS("res_multiv_model_presence.rds")
-multiv_model_abundance <- readRDS("res_multiv_model_abundance.rds")
+multiv_model_presence_explanatory <- readRDS("res_multiv_model_presence.rds")
+multiv_model_abundance_explanatory <- readRDS("res_multiv_model_abundance.rds")
 
-model_presence <- multiv_model_presence[[1]] #### sum up of presence model
-df_cv_presence <- multiv_model_presence[[2]]#### data frame with prediction
-df_mod_presence <- multiv_model_presence[[3]] #### data frame which was used to build the model
+multiv_model_presence_forecasting <- readRDS("res_multiv_model_presence_forecasting_llo.rds")
+multiv_model_abundance_forecasting <- readRDS("res_multiv_model_abundance_forecasting_llo.rds")
 
-model_abundance <- multiv_model_abundance[[1]] #### sum up of abundance model
-df_cv_abundance <- multiv_model_abundance[[2]] #### data frame with prediction
-df_mod_abundance <- multiv_model_abundance[[3]] #### data frame which was used to build the model
+model_presence_explanatory <- multiv_model_presence_explanatory[[1]] #### sum up of presence model
+df_cv_presence_explanatory <- multiv_model_presence_explanatory[[2]]#### data frame with prediction
+df_mod_presence_explanatory <- multiv_model_presence_explanatory[[3]] #### data frame which was used to build the model
+
+model_abundance_explanatory <- multiv_model_abundance_explanatory[[1]] #### sum up of abundance model
+df_cv_abundance_explanatory <- multiv_model_abundance_explanatory[[2]] #### data frame with prediction
+df_mod_abundance_explanatory <- multiv_model_abundance_explanatory[[3]] #### data frame which was used to build the model
+
+
+model_presence_forecasting <- multiv_model_presence_forecasting[[1]] #### sum up of presence model
+df_cv_presence_forecasting <- multiv_model_presence_forecasting[[2]]#### data frame with prediction
+df_mod_presence_forecasting <- multiv_model_presence_forecasting[[3]] #### data frame which was used to build the model
+
+model_abundance_forecasting <- multiv_model_abundance_forecasting[[1]] #### sum up of abundance model
+df_cv_abundance_forecasting <- multiv_model_abundance_forecasting[[2]] #### data frame with prediction
+df_mod_abundance_forecasting <- multiv_model_abundance_forecasting[[3]] #### data frame which was used to build the model
+
+
+
+df_cv_presence_explanatory2 <- df_cv_presence_explanatory %>%
+  mutate(pred_stat_presence_explanatory = ifelse(pred_final == "Presence",1,0)) %>%
+  dplyr::select(site,week,Year,pred_stat_presence_explanatory)
+
+df_cv_presence_forecasting2 <- df_cv_presence_forecasting %>%
+  mutate(pred_stat_presence_forecasting = ifelse(pred_final == "Presence",1,0)) %>%
+  dplyr::select(site,week,Year,pred_stat_presence_forecasting)
+
+
+df_cv_abundance_explanatory2 <- df_cv_abundance_explanatory %>%
+  mutate(pred_stat_abundance_explanatory = exp(pred)) %>%
+  dplyr::select(site,week,Year,pred_stat_abundance_explanatory)
+
+df_cv_abundance_forecasting2 <- df_cv_abundance_forecasting %>%
+  mutate(pred_stat_abundance_forecasting = exp(pred)) %>%
+  dplyr::select(site,week,Year,pred_stat_abundance_forecasting)
+
+df_cv_paul <- df_cv_presence_explanatory2 %>%
+  left_join(df_cv_presence_forecasting2) %>%
+  left_join(df_cv_abundance_explanatory2) %>%
+  left_join(df_cv_abundance_forecasting2) %>%
+  mutate(pred_final_explanatory = ifelse(pred_stat_presence_explanatory==0, pred_stat_presence_explanatory,pred_stat_abundance_explanatory)) %>%
+  mutate(pred_final_forecasting = ifelse(pred_stat_presence_forecasting==0, pred_stat_presence_forecasting,pred_stat_abundance_forecasting)) %>%
+  dplyr::select(site,week,Year,pred_final_explanatory,pred_final_forecasting) %>%
+  rename(pred_stat_explanatory = pred_final_explanatory, pred_stat_forecasting = pred_final_forecasting)
 
 # data andrea
-load("table_Metelmann.RData")
-df_cv_presence_andrea <- presence_tot_df %>% mutate(pred_final = ifelse(pred_final==0, "Absence","Presence")) %>% rename(Year = year, pred_andrea = pred_final) %>% mutate(Year = as.numeric(as.character(Year))) %>% mutate(site = ifelse(site=="MONTPELLIER CENTRE","MONTPELLIER",site)) %>% dplyr::select(-c("obs","pred"))
-df_cv_abundance_andrea <- abundance_tot_df
+load("dataframe_Metelmann_Arbocarto_Andrea.RData") # abundance_tot_df
+
+df_cv_andrea <- abundance_tot_df %>%
+  rename(Year = year) %>%
+  mutate(Year = as.numeric(as.character(Year))) %>%
+  filter(!(site %in% c("MONTPELLIER","TOULOUSE")), Year>2022)
+
+df <- df_cv_andrea %>%
+  left_join(df_cv_paul)
+
+df %>%
+  rename(obs_mathematical = obs) %>%
+  mutate(obs_statistical = obs_mathematical) %>%
+  mutate_at(c("obs_mathematical","pred_metelmann", "pred_arbocarto"), funs(c(scales::rescale(., to = c(0, 1))))) %>%
+  pivot_longer(-c('site', 'Year', 'week')) %>%
+  mutate(date = as.Date(paste(Year, week, 1, sep = "-"), "%Y-%U-%u")) %>%
+  mutate(model = case_when(
+    name %in% c("obs_mathematical","pred_metelmann", "pred_arbocarto") ~ 'Mathematical models',
+    name %in% c("obs_statistical","pred_stat_explanatory", "pred_stat_forecasting") ~ 'Statistical models'  )) %>%
+  # Duplicate "obs" so it appears in both "mathematical" and "statistical" facets
+  mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" ))) %>%
+  ggplot(aes(x = date, y = value, color = name, group = name, size = ifelse(name %in% c("obs_mathematical","obs_statistical"), 0.5, 0.3))) +
+  geom_line() +
+  facet_grid(cols = vars(site), rows = vars(model), scales = "free_y") +
+ scale_color_manual(values = c(
+    "obs_mathematical" = "#49423c",  # Observed values in black
+    "obs_statistical" = "#49423c",  # Observed values in black
+    "pred_arbocarto" = "#56B4E9",  # Similar blue for Arbocarto
+    "pred_metelmann" = "#4292c6",  # Slightly different but close blue for Metelman
+    "pred_stat_explanatory" = "#E69F00",
+    "pred_stat_forecasting" = "#D55E00"
+  ),
+  labels = c(
+    "obs_mathematical" = "Observations",
+    "obs_statistical" = "",
+    "pred_arbocarto" = "Arbocarto",
+    "pred_metelmann" = "Metelmann",
+    "pred_stat_explanatory" = "ML explanatory",
+    "pred_stat_forecasting" = "ML forecasting"))+
+  scale_size_identity() +
+  ylab("Egg abundance") +
+  labs(color = 'Model') +
+  theme(
+    legend.position = "bottom",
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "grey"),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8),
+    axis.title.x=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks.x=element_line(colour = "grey"),
+    axis.ticks.y=element_line(colour = "grey")
+  )
 
 
-df_cv_presence_twomodels <- df_cv_presence %>%
-  left_join(df_cv_presence_andrea, by = c("site","week", "Year"))
+## obs vs pred values
+df %>%
+  group_by(site) %>%
+  summarise(spearman_metelmann = round(cor(obs, pred_metelmann, method="spearman", use = "complete.obs"),2),
+            spearman_arbocarto = round(cor(obs, pred_arbocarto, method="spearman", use = "complete.obs"),2),
+            spearman_ML_explanatory = round(cor(obs, pred_stat_explanatory, method="spearman", use = "complete.obs"),2),
+            spearman_ML_forecasting = round(cor(obs, pred_stat_forecasting, method="spearman", use = "complete.obs"),2),
+            )
+
+
+
+
+# ## delays between start of the seasons and modeled values
+# begin_season_obs <- df_cv_andrea %>%
+#   left_join(df_cv_paul) %>%
+#   arrange(site,Year,week) %>%
+#   filter(obs > 0) %>%  # Keep only rows where obs is not zero
+#   group_by(site, Year) %>%  # Group by site and year
+#   slice_min(week) %>%
+#   ungroup() %>%
+#   dplyr::select(site, Year,  week)
+#
+# begin_season_metelmann <- df_cv_andrea %>%
+#   left_join(df_cv_paul) %>%
+#   arrange(site,Year,week) %>%
+#   filter(pred_metelmann > 0) %>%  # Keep only rows where obs is not zero
+#   group_by(site, Year) %>%  # Group by site and year
+#   slice_min(week) %>%
+#   ungroup() %>%
+#   dplyr::select(site, Year,  week)
+
 
 ###########################
 #########'Presence model
@@ -134,7 +251,12 @@ pdps <- list()
 
 imp <- imp %>% filter(var!="site")
 
+df$site=as.factor(df$site)
+
 for(i in 1:length(imp$var)){
+
+  # pd <- pdp::partial(model, pred.var = c(imp$var[i],"site"), pred.fun = pred_wrapper_classif, train = df)
+  # ggplot(pd, aes(x=TM_0_8, y=yhat, colour = site))+ geom_line()
 
   pd <- pdp::partial(model, pred.var = imp$var[i], pred.fun = pred_wrapper_classif, train = df) ## array that returns predictions of a variable in a model
   pd$yhat[which(pd$yhat<0)] <-0
