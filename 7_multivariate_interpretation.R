@@ -7,8 +7,11 @@ library(precrec) ## Version ‘0.14.4’
 
 ########################### Open dataset containing the results of presence and abundance models
 
-multiv_model_presence_explanatory <- readRDS("res_multiv_model_presence.rds")
-multiv_model_abundance_explanatory <- readRDS("res_multiv_model_abundance.rds")
+multiv_model_presence_explanatory <- readRDS("res_multiv_model_presence_explanatory.rds")
+multiv_model_abundance_explanatory <- readRDS("res_multiv_model_abundance_explanatory.rds")
+
+multiv_model_presence_nowcasting <- readRDS("res_multiv_model_presence_nowcasting.rds")
+multiv_model_abundance_nowcasting <- readRDS("res_multiv_model_abundance_nowcasting.rds")
 
 multiv_model_presence_forecasting <- readRDS("res_multiv_model_presence_forecasting_llo.rds")
 multiv_model_abundance_forecasting <- readRDS("res_multiv_model_abundance_forecasting_llo.rds")
@@ -20,6 +23,14 @@ df_mod_presence_explanatory <- multiv_model_presence_explanatory[[3]] #### data 
 model_abundance_explanatory <- multiv_model_abundance_explanatory[[1]] #### sum up of abundance model
 df_cv_abundance_explanatory <- multiv_model_abundance_explanatory[[2]] #### data frame with prediction
 df_mod_abundance_explanatory <- multiv_model_abundance_explanatory[[3]] #### data frame which was used to build the model
+
+model_presence_nowcasting <- multiv_model_presence_nowcasting[[1]] #### sum up of presence model
+df_cv_presence_nowcasting <- multiv_model_presence_nowcasting[[2]]#### data frame with prediction
+df_mod_presence_nowcasting <- multiv_model_presence_nowcasting[[3]] #### data frame which was used to build the model
+
+model_abundance_nowcasting <- multiv_model_abundance_nowcasting[[1]] #### sum up of abundance model
+df_cv_abundance_nowcasting <- multiv_model_abundance_nowcasting[[2]] #### data frame with prediction
+df_mod_abundance_nowcasting <- multiv_model_abundance_nowcasting[[3]] #### data frame which was used to build the model
 
 
 model_presence_forecasting <- multiv_model_presence_forecasting[[1]] #### sum up of presence model
@@ -36,6 +47,10 @@ df_cv_presence_explanatory2 <- df_cv_presence_explanatory %>%
   mutate(pred_stat_presence_explanatory = ifelse(pred_final == "Presence",1,0)) %>%
   dplyr::select(site,week,Year,pred_stat_presence_explanatory)
 
+df_cv_presence_nowcasting2 <- df_cv_presence_nowcasting %>%
+  mutate(pred_stat_presence_nowcasting = ifelse(pred_final == "Presence",1,0)) %>%
+  dplyr::select(site,week,Year,pred_stat_presence_nowcasting)
+
 df_cv_presence_forecasting2 <- df_cv_presence_forecasting %>%
   mutate(pred_stat_presence_forecasting = ifelse(pred_final == "Presence",1,0)) %>%
   dplyr::select(site,week,Year,pred_stat_presence_forecasting)
@@ -45,18 +60,25 @@ df_cv_abundance_explanatory2 <- df_cv_abundance_explanatory %>%
   mutate(pred_stat_abundance_explanatory = exp(pred)) %>%
   dplyr::select(site,week,Year,pred_stat_abundance_explanatory)
 
+df_cv_abundance_nowcasting2 <- df_cv_abundance_nowcasting %>%
+  mutate(pred_stat_abundance_nowcasting = exp(pred)) %>%
+  dplyr::select(site,week,Year,pred_stat_abundance_nowcasting)
+
 df_cv_abundance_forecasting2 <- df_cv_abundance_forecasting %>%
   mutate(pred_stat_abundance_forecasting = exp(pred)) %>%
   dplyr::select(site,week,Year,pred_stat_abundance_forecasting)
 
 df_cv_paul <- df_cv_presence_explanatory2 %>%
+  left_join(df_cv_presence_nowcasting2) %>%
   left_join(df_cv_presence_forecasting2) %>%
   left_join(df_cv_abundance_explanatory2) %>%
+  left_join(df_cv_abundance_nowcasting2) %>%
   left_join(df_cv_abundance_forecasting2) %>%
   mutate(pred_final_explanatory = ifelse(pred_stat_presence_explanatory==0, pred_stat_presence_explanatory,pred_stat_abundance_explanatory)) %>%
+  mutate(pred_final_nowcasting = ifelse(pred_stat_presence_nowcasting==0, pred_stat_presence_nowcasting,pred_stat_abundance_nowcasting)) %>%
   mutate(pred_final_forecasting = ifelse(pred_stat_presence_forecasting==0, pred_stat_presence_forecasting,pred_stat_abundance_forecasting)) %>%
-  dplyr::select(site,week,Year,pred_final_explanatory,pred_final_forecasting) %>%
-  rename(pred_stat_explanatory = pred_final_explanatory, pred_stat_forecasting = pred_final_forecasting)
+  dplyr::select(site,week,Year,pred_final_explanatory,pred_final_nowcasting,pred_final_forecasting) %>%
+  rename(pred_stat_explanatory = pred_final_explanatory, pred_stat_nowcasting = pred_final_nowcasting, pred_stat_forecasting = pred_final_forecasting)
 
 # data andrea
 load("dataframe_Metelmann_Arbocarto_Andrea.RData") # abundance_tot_df
@@ -77,11 +99,12 @@ df %>%
   mutate(date = as.Date(paste(Year, week, 1, sep = "-"), "%Y-%U-%u")) %>%
   mutate(model = case_when(
     name %in% c("obs_mathematical","pred_metelmann", "pred_arbocarto") ~ 'Mathematical models',
-    name %in% c("obs_statistical","pred_stat_explanatory", "pred_stat_forecasting") ~ 'Statistical models'  )) %>%
+    name %in% c("obs_statistical","pred_stat_explanatory", "pred_stat_nowcasting","pred_stat_forecasting") ~ 'Statistical models'  )) %>%
   # Duplicate "obs" so it appears in both "mathematical" and "statistical" facets
   mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" ))) %>%
   ggplot(aes(x = date, y = value, color = name, group = name, size = ifelse(name %in% c("obs_mathematical","obs_statistical"), 0.5, 0.3))) +
   geom_line() +
+  geom_point(size = 0.4) +
   facet_grid(cols = vars(site), rows = vars(model), scales = "free_y") +
  scale_color_manual(values = c(
     "obs_mathematical" = "#49423c",  # Observed values in black
@@ -89,6 +112,7 @@ df %>%
     "pred_arbocarto" = "#56B4E9",  # Similar blue for Arbocarto
     "pred_metelmann" = "#4292c6",  # Slightly different but close blue for Metelman
     "pred_stat_explanatory" = "#E69F00",
+    "pred_stat_nowcasting" = "#E64F90",
     "pred_stat_forecasting" = "#D55E00"
   ),
   labels = c(
@@ -97,6 +121,7 @@ df %>%
     "pred_arbocarto" = "Arbocarto",
     "pred_metelmann" = "Metelmann",
     "pred_stat_explanatory" = "ML explanatory",
+    "pred_stat_nowcasting" = "ML nowcasting",
     "pred_stat_forecasting" = "ML forecasting"))+
   scale_size_identity() +
   ylab("Egg abundance") +
@@ -109,7 +134,8 @@ df %>%
     axis.title.x=element_blank(),
     axis.text.y=element_blank(),
     axis.ticks.x=element_line(colour = "grey"),
-    axis.ticks.y=element_line(colour = "grey")
+    axis.ticks.y=element_line(colour = "grey"),
+    text = element_text(family = "Georgia")
   )
 
 
@@ -119,6 +145,7 @@ df %>%
   summarise(spearman_metelmann = round(cor(obs, pred_metelmann, method="spearman", use = "complete.obs"),2),
             spearman_arbocarto = round(cor(obs, pred_arbocarto, method="spearman", use = "complete.obs"),2),
             spearman_ML_explanatory = round(cor(obs, pred_stat_explanatory, method="spearman", use = "complete.obs"),2),
+            spearman_ML_nowcasting = round(cor(obs, pred_stat_nowcasting, method="spearman", use = "complete.obs"),2),
             spearman_ML_forecasting = round(cor(obs, pred_stat_forecasting, method="spearman", use = "complete.obs"),2),
             )
 
@@ -144,6 +171,178 @@ df %>%
 #   ungroup() %>%
 #   dplyr::select(site, Year,  week)
 
+
+### Variable importance plot
+
+library(vip)
+
+pfun_presence <- function(object, newdata) {
+  p <- predict(object, newdata = newdata, type ="prob")[,"Presence"]
+}
+
+vis_presence <- vi(model_presence_nowcasting, method = "permute", train = df_mod_presence_nowcasting, target = "PRES_ALBO", metric = "roc_auc",pred_wrapper = pfun_presence, nsim = 30, event_level = 'first', feature_names = model_presence_nowcasting$finalModel$xNames)
+
+vip(vis_presence, geom = "col")+ theme_bw() + ggtitle("Presence model : VIP")
+
+
+
+pfun_abundance <- function(object, newdata) {
+  p <- predict(object, newdata = newdata)
+}
+
+vis_abundance <- vi(model_abundance_nowcasting, method = "permute", train = df_mod_abundance_nowcasting, target = "NB_ALBO_TOT", metric = "mae",pred_wrapper = pfun_abundance, nsim = 30, feature_names = model_abundance_nowcasting$finalModel$xNames)
+
+vip(vis_abundance, geom = "col") + theme_bw() + ggtitle("Abundance model : VIP")
+
+
+### partial dependence plot
+
+library(pdp)
+
+pred_wrapper_classif <- function(object, newdata) {
+  p <- predict(object, newdata = newdata, type ="prob")[,"Presence"]
+  c("avg" = mean(p))
+}
+
+pdps <- list()
+
+
+for(i in 1:length(vis_presence$Variable)){
+
+
+  pd1 <- pdp::partial(model_presence_nowcasting, pred.var = vis_presence$Variable[i], pred.fun = pred_wrapper_classif, train = df_mod_presence_nowcasting)
+  pd1$site = "average"
+
+  sites <- c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" )
+
+  pd <- data.frame()
+
+  for(j in 1:length(sites)){
+    th_pd <- pdp::partial(model_presence_nowcasting, pred.var = vis_presence$Variable[i], pred.fun = pred_wrapper_classif, train = df_mod_presence_nowcasting %>% filter(site==sites[j])) ## array that returns predictions of a variable in a model
+    th_pd$site <- sites[j]
+    pd <- rbind(pd,th_pd)
+  }
+
+  pd <- rbind(pd1,pd)
+
+  pd$yhat[which(pd$yhat<0)] <-0
+
+  pdps[[i]] <- ggplot() +
+    geom_line(data=pd, aes_string(x=vis_presence$Variable[i], y="yhat", group = "site", color = "site")) +
+    geom_rug(data=df_mod_presence_nowcasting, aes_string(x = vis_presence$Variable[i]), sides="b") +
+    theme_bw() +
+    ylim(c(0,1)) +
+    ylab("Presence probability")
+
+}
+
+plot_pdps_presence <- patchwork::wrap_plots(pdps) + plot_annotation(title = "Presence model : PDP") + plot_layout(guides = "collect") & theme(legend.position='bottom')
+
+
+
+# Abundance
+
+pred_wrapper_reg <- function(object, newdata) {
+  p <- predict(object, newdata = newdata)
+  c("avg" = mean(p))
+}
+
+
+pdps <- list()
+
+for(i in 1:length(vis_abundance$Variable)){
+
+
+  pd1 <- pdp::partial(model_abundance_nowcasting, pred.var = vis_abundance$Variable[i], pred.fun = pred_wrapper_reg, train = df_mod_abundance_nowcasting)
+  pd1$site = "average"
+
+  sites <- c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" )
+
+  pd <- data.frame()
+
+  for(j in 1:length(sites)){
+    th_pd <- pdp::partial(model_abundance_nowcasting, pred.var = vis_abundance$Variable[i], pred.fun = pred_wrapper_reg, train = df_mod_abundance_nowcasting %>% filter(site==sites[j])) ## array that returns predictions of a variable in a model
+    th_pd$site <- sites[j]
+    pd <- rbind(pd,th_pd)
+  }
+
+  pd <- rbind(pd1,pd)
+
+  pd$yhat[which(pd$yhat<0)] <-0
+  pd$yhat <- exp(pd$yhat)
+
+  pdps[[i]] <- ggplot() +
+    geom_line(data=pd, aes_string(x=vis_abundance$Variable[i], y="yhat", group = "site", color = "site")) +
+    geom_rug(data=df_mod_abundance_nowcasting, aes_string(x = vis_abundance$Variable[i]), sides="b") +
+    theme_bw() +
+    ylim(c(0,35)) +
+    ylab("Abundance")
+
+}
+
+plot_pdps_abundance <- patchwork::wrap_plots(pdps) + plot_annotation(title = "Abundance model : PDP") + plot_layout(guides = "collect") & theme(legend.position='bottom')
+
+
+
+########################
+## Local interpretation
+########################
+
+library(lime)
+
+df_mod_presence_nowcasting_lime <- df_mod_presence_nowcasting %>% dplyr::select(vis_presence$Variable,"site")
+explainer_presence <- lime(df_mod_presence_nowcasting_lime, model_presence_nowcasting, n_bins = 5)
+
+explanation_presence <- explain(
+  x = df_mod_presence_nowcasting_lime[46:56,],
+  explainer = explainer_presence,
+  n_permutations = 5000,
+  dist_fun = "gower",
+  kernel_width = .75,
+  n_features = 10,
+  feature_select = "highest_weights",
+  labels = "Presence"
+)
+
+plot_features(explanation_presence)
+
+plot_explanations(explanation_presence)
+
+###########
+# abundance
+##########
+
+df_mod_abundance_nowcasting_lime <- df_mod_abundance_nowcasting %>% dplyr::select(vis_abundance$Variable,"site")
+explainer_abundance <- lime(df_mod_abundance_nowcasting_lime, model_abundance_nowcasting, n_bins = 5)
+
+x = df_mod_abundance_nowcasting %>% filter(site=="PEROLS", Year == 2023)
+
+explanation_abundance <- explain(
+  x = x %>% dplyr::select(vis_abundance$Variable,"site"),
+  explainer = explainer_abundance,
+  n_permutations = 5000,
+  dist_fun = "gower",
+  kernel_width = .75,
+  n_features = 10,
+  feature_select = "highest_weights")
+
+x2 = df_cv_abundance_nowcasting %>%
+  filter(site=="PEROLS", Year == 2023) %>%
+  pivot_longer(c("obs","pred")) %>%
+  mutate(value = exp(value))
+
+
+plot_features(explanation_abundance)
+
+explanation_abundance$case <- rep(x$week,each = length(c(vis_abundance$Variable,"site")))
+
+p = ggplot(x2, aes(x=week, y = value, group = name, color = name)) + geom_point() + geom_line() + theme_bw() + scale_x_continuous(breaks = x$week, position = "top")
+
+p_expla <- plot_explanations(explanation_abundance) +
+  theme(axis.title.x=element_blank()) #+
+  #scale_fill_gradient( transform = 'sqrt' )
+
+p_expla/p
 
 ###########################
 #########'Presence model

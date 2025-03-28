@@ -34,12 +34,12 @@ df_model <- df_model %>%
 
 
 ##### First step: to select variables for presence models
-predictors_presence <- c("TM_0_8","TN_0_8","TX_0_8","UM_0_8","RR_0_8","DRR_0_8","FFM_0_8")
+predictors_presence <- c("TM_0_8","TN_0_8","TX_0_8","UM_0_8","RR_0_8","DRR_0_8","FFM_0_8","RFNO")
 
 ##### Plot the bivariate relationship between presence and each selected predictor
 p_pres <- df_model %>%
   dplyr::select(PRES_ALBO_NUMERIC,predictors_presence) %>%
-  pivot_longer(PRES_ALBO_NUMERIC) %>%
+  pivot_longer(-PRES_ALBO_NUMERIC) %>%
   ggplot(aes(y = PRES_ALBO_NUMERIC, x = value)) +
   geom_point() +
   ylim(c(0,1)) +
@@ -57,7 +57,7 @@ df_cor <- subset(as.data.frame(index) , row <= col)
 p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_cor[,2]])
 
 ## Final variables selections
-predictors_presence <- c("TM_0_8","UM_0_8","RR_0_8","DRR_0_8","FFM_0_8")
+predictors_presence <- c("TM_0_8","UM_0_8","RR_0_8","DRR_0_8","FFM_0_8","RFNO")
 
 #### Final data frame for the multivariate analysis
 df_model_presence <- df_model %>%
@@ -73,7 +73,7 @@ df_model_presence <- df_model %>%
 ###########################
 
 ##### First step: select variables for abundance models
-predictors_abundance <- c("TM_0_4","TN_0_4","TX_0_4","UM_0_4","RR_0_4","DRR_0_4","FFM_0_4")
+predictors_abundance <- c("TM_0_4","TN_0_4","TX_0_4","UM_0_4","RR_0_4","DRR_0_4","FFM_0_4","RFNO")
 
 
 df_model_abundance <- df_model %>%
@@ -82,13 +82,13 @@ df_model_abundance <- df_model %>%
 
 #####  Plot the bivariate relationship between abundance and each selected predictor
 p_ab <- df_model_abundance %>%
-  dplyr::select(NB_ALBO_TOT,predictors_abundance) %>%
-  pivot_longer(-NB_ALBO_TOT) %>%
-  ggplot(aes(y = NB_ALBO_TOT, x = value)) +
+  dplyr::select(NB_ALBO_TOT,predictors_abundance, site,Year) %>%
+  pivot_longer(-c("NB_ALBO_TOT","site","Year")) %>%
+  ggplot(aes(y = NB_ALBO_TOT, x = value, group = site, color = site)) +
   geom_point() +
-  geom_smooth() +
+  geom_smooth(se = F) +
   ylim(c(0,80)) +
-  facet_wrap(.~name, scales = "free_x") +
+  facet_wrap(name~Year, scales = "free_x") +
   theme_bw() +
   ggtitle("Abondance albo ~ variables séléctionnées")
 
@@ -102,7 +102,7 @@ p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_
 
 
 ## Final variables selections
-predictors_abundance <- c("TM_0_4","UM_0_4","RR_0_4","DRR_0_4","FFM_0_4")
+predictors_abundance <- c("TM_0_4","UM_0_4","RR_0_4","DRR_0_4","FFM_0_4","RFNO")
 
 
 #### Final data frame for the multivariate analysis
@@ -151,8 +151,8 @@ df_cv_presence <- mod_presence$pred %>%
   mutate(obs = ifelse(obs == "Absence",0,1)) %>%
   dplyr::rename(pred_final = pred, pred = Presence)
 
-res_multiv_model_presence <- list(model = mod_presence, df_cv = df_cv_presence, df_mod = df_model_presence) ## to save models, data frame of the model and predictions
-saveRDS(res_multiv_model_presence,"res_multiv_model_presence.rds")
+res_multiv_model_presence_nowcasting <- list(model = mod_presence, df_cv = df_cv_presence, df_mod = df_model_presence) ## to save models, data frame of the model and predictions
+saveRDS(res_multiv_model_presence_nowcasting,"res_multiv_model_presence_nowcasting.rds")
 
 ##############
 #####" abundance
@@ -160,7 +160,7 @@ saveRDS(res_multiv_model_presence,"res_multiv_model_presence.rds")
 
 df_model_abundance$NB_ALBO_TOT <- log(df_model_abundance$NB_ALBO_TOT)
 
-cv_col <- "site"
+cv_col <- "Year"
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance, spacevar = cv_col,k = length(unique(unlist(df_model_abundance[,cv_col]))))
@@ -181,6 +181,56 @@ df_cv_abundance <- mod_abundance$pred %>%
   left_join(df_model_abundance) %>%
   dplyr::select(pred,obs,site,week,Year)
 
-res_multiv_model_abundance <- list(model = mod_abundance, df_cv = df_cv_abundance, df_mod = df_model_abundance) ## to save models, data frame of the model and predictions
-saveRDS(res_multiv_model_abundance,"res_multiv_model_abundance.rds")
+res_multiv_model_abundance_nowcasting <- list(model = mod_abundance, df_cv = df_cv_abundance, df_mod = df_model_abundance) ## to save models, data frame of the model and predictions
+saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcasting.rds")
 
+
+
+##############
+## modèle explicatif
+################
+
+
+predictors_presence <- c(predictors_presence,"site")
+predictors_abundance <- c(predictors_abundance,"site")
+
+tr = trainControl(method="none", ## Definition of method sampling: cross validation
+                  summaryFunction = twoClassSummary,#comboSummary, ## Calcul of ROC and AUC
+                  classProbs = TRUE,
+                  savePredictions = 'final',
+                  verboseIter = FALSE
+)
+
+#### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the ROC
+mod_presence <- caret::train(x = df_model_presence[,predictors_presence], y = df_model_presence$PRES_ALBO, method = "ranger", tuneLength = 1, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
+
+
+#### Last step: to put predictions on same data frame
+
+df_cv_presence <- predict(mod_presence) %>%
+  bind_cols(predict(mod_presence, type = 'prob')$Presence) %>%
+  bind_cols(df_model_presence) %>%
+  dplyr::rename(pred = ...1, Presence = ...2, obs = PRES_ALBO ) %>%
+  dplyr::select(pred,Presence,obs,site,week,Year) %>%
+  mutate(obs = ifelse(obs == "Absence",0,1)) %>%
+  dplyr::rename(pred_final = pred, pred = Presence)
+
+res_multiv_model_presence_explanatory <- list(model = mod_presence, df_cv = df_cv_presence, df_mod = df_model_presence) ## to save models, data frame of the model and predictions
+saveRDS(res_multiv_model_presence_explanatory,"res_multiv_model_presence_explanatory.rds")
+
+
+# abundance
+
+tr = trainControl(method="none",
+                  savePredictions = 'final')
+
+mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 1, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
+
+
+df_cv_abundance <- predict(mod_abundance)  %>%
+  bind_cols(df_model_abundance) %>%
+  dplyr::rename(pred = ...1, obs = NB_ALBO_TOT) %>%
+  dplyr::select(pred,obs,site,week,Year)
+
+res_multiv_model_abundance_explanatory <- list(model = mod_abundance, df_cv = df_cv_abundance, df_mod = df_model_abundance) ## to save models, data frame of the model and predictions
+saveRDS(res_multiv_model_abundance_explanatory,"res_multiv_model_abundance_explanatory.rds")
