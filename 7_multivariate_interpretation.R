@@ -293,8 +293,10 @@ library(lime)
 df_mod_presence_nowcasting_lime <- df_mod_presence_nowcasting %>% dplyr::select(vis_presence$Variable,"site")
 explainer_presence <- lime(df_mod_presence_nowcasting_lime, model_presence_nowcasting, n_bins = 5)
 
+x = df_mod_presence_nowcasting %>% filter(site=="PEROLS", Year == 2023)
+
 explanation_presence <- explain(
-  x = df_mod_presence_nowcasting_lime[46:56,],
+  x = x %>% dplyr::select(vis_presence$Variable,"site"),
   explainer = explainer_presence,
   n_permutations = 5000,
   dist_fun = "gower",
@@ -339,8 +341,7 @@ explanation_abundance$case <- rep(x$week,each = length(c(vis_abundance$Variable,
 p = ggplot(x2, aes(x=week, y = value, group = name, color = name)) + geom_point() + geom_line() + theme_bw() + scale_x_continuous(breaks = x$week, position = "top")
 
 p_expla <- plot_explanations(explanation_abundance) +
-  theme(axis.title.x=element_blank()) #+
-  #scale_fill_gradient( transform = 'sqrt' )
+  theme(axis.title.x=element_blank())
 
 p_expla/p
 

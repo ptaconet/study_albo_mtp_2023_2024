@@ -42,6 +42,7 @@ df_meteofrance_2023_2024 <- read.csv(file.path("data","processed","data_meteofra
 #   mutate(year = factor(year, levels = c("2023", "2024", "moy. 1950-2022","proj. 2023-2100 (scenario rcp4.5)")))
 
 
+
 cbp1 <-c("#FD9B63", "#E7D37F","#81A263","#B60071")
 
 # précipitations
@@ -56,9 +57,6 @@ p1 <- ggplot() +
   labs(title="Oeufs albo et précipitation cumulées", x ="Semaine") +
   theme_bw()
 
-ggplot() +
-
-
 # températures
 scaleFactor2 <- max(df_meteofrance$TMN, na.rm = T) / max(pieges_data$effectif_jour_PP, na.rm = T)
 
@@ -72,6 +70,14 @@ p2 <- ggplot() +
   theme_bw()
 
 p2/p1 + plot_layout(guides = "collect")
+
+
+
+
+
+
+## 3 échelles : voir https://stackoverflow.com/questions/71630756/is-it-possible-to-add-a-third-y-axis-to-ggplot2
+
 
 ## par site - pas forcément très pertinent...
 #
@@ -137,6 +143,50 @@ p2/p1 + plot_layout(guides = "collect")
 #
 
 
+pieges_data <- pieges_data %>%
+  group_by(week, year, site) %>%
+  summarise(effectif_jour=mean(effectif_jour, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(date = as.Date(paste(year, week, 1, sep="-"), "%Y-%U-%u")) %>%
+  mutate(year=year(date))
+
+df <- df_meteofrance_2023_2024 %>%
+  mutate(year = as.numeric(year)) %>%
+  left_join(pieges_data, by = c("year","week","site")) %>%
+  filter(year %in% c(2023, 2024)) %>%
+  mutate(date = as.Date(paste(year, week, 1, sep="-"), "%Y-%U-%u")) %>%
+  mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" )))
+
+df <- df %>% filter(site %in% c("PEROLS","MURVIEL-LES-MONTPELLIER","SAINT-MEDARD-EN-JALLES","BAYONNE"))
+
+# Scaling factor for mosquito abundance (adjust as needed)
+scaleFactor <- 0.6
+
+
+dates_init <- df %>%
+  group_by(year, site) %>%
+  filter(effectif_jour> 0) %>%
+  slice(1) %>%
+  ungroup()
+
+# Plot
+ggplot(df, aes(x = date)) +
+  geom_col(aes(y = RFD), fill = "lightblue", alpha = 0.6) +  # Rainfall as bars
+  geom_line(aes(y = TMN, color = "Temperature"), size = 0.5) +  # Temperature as line
+  geom_point(aes(y = effectif_jour * scaleFactor,  color = "Mosquito Abundance")) +
+  geom_line(data=df[!is.na(df$effectif_jour),], aes(y = effectif_jour * scaleFactor, color = "Mosquito Abundance"), size = 0.5) +  # Scaled mosquito abundance
+   scale_y_continuous(
+     name = "Temperature (°C) / Rainfall (mm)",
+     limits = c(0,50),
+     sec.axis = sec_axis(~ . / scaleFactor, name = "Mosquito Abundance (scaled)")  # Secondary axis for mosquito counts
+   ) +
+  scale_color_manual(values = c("Temperature" = "blue", "Mosquito Abundance" = "red")) +  # Custom colors
+  labs(x = "Date", color = "Legend") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  facet_wrap(.~site) +
+  geom_label(data= dates_init, aes(label=week, xintercept = date, y = 4))
 
 
 
@@ -145,9 +195,22 @@ p2/p1 + plot_layout(guides = "collect")
 
 
 
-
-
-
+ggplot(df, aes(x = week, group = as.factor(year), colour = as.factor(year))) +
+  #geom_col(aes(y = RFD), position = "dodge", alpha = 0.6) +  # Rainfall as bars
+  geom_line(aes(y = TMN), size = 0.5) +  # Temperature as line
+  geom_point(aes(y = effectif_jour * scaleFactor)) +
+  geom_line(data=df[!is.na(df$effectif_jour),], aes(y = effectif_jour * scaleFactor), size = 0.5) +  # Scaled mosquito abundance
+  scale_y_continuous(
+    name = "Temperature (°C)",
+    limits = c(0,50),
+    sec.axis = sec_axis(~ . / scaleFactor, name = "Mosquito Abundance (scaled)")  # Secondary axis for mosquito counts
+  ) +
+  scale_fill_manual(values = cbp1, name = "Collectes Oeufs") +
+  labs(x = "Date", color = "Legend") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  facet_wrap(.~site)
 
 
 
@@ -258,6 +321,12 @@ ggplot() +
   theme(panel.grid = element_blank())
 
 
+ggplot() +
+  geom_line(data = df2 %>% filter(name %in% c("effectif_jour_2023","effectif_jour_2024","TMN_2024","TMN_2023")), aes(x = week, y = value, group = as.factor(name), color = as.factor(name))) +
+  #stat_smooth(data = df2 %>% filter(name %in% c("RFD_2024","RFD_2023")), aes(x = week, y = value, group = as.factor(name), color = as.factor(name)), method = "gam", se = FALSE, linewidth = 1) +
+  facet_wrap(.~nom_commune) +
+  theme_bw() +
+  theme(panel.grid = element_blank())
 
 
 
