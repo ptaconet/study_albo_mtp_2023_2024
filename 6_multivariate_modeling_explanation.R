@@ -34,12 +34,12 @@ df_model <- df_model %>%
 
 
 ##### First step: to select variables for presence models
-predictors_presence <- c("TM_0_8","TN_0_8","TX_0_8","UM_0_8","RR_0_8","DRR_0_8","FFM_0_8","RFNO")
+predictors_presence <- c("TM_0_8","TN_0_7","TX_0_9","UM_5_11","RR_7_8","DRR_0_8","FFM_0_1")
 
 ##### Plot the bivariate relationship between presence and each selected predictor
 p_pres <- df_model %>%
-  dplyr::select(PRES_ALBO_NUMERIC,predictors_presence) %>%
-  pivot_longer(-PRES_ALBO_NUMERIC) %>%
+  dplyr::select(PRES_ALBO_NUMERIC,predictors_presence, site) %>%
+  pivot_longer(-c("PRES_ALBO_NUMERIC","site")) %>%
   ggplot(aes(y = PRES_ALBO_NUMERIC, x = value)) +
   geom_point() +
   ylim(c(0,1)) +
@@ -57,7 +57,7 @@ df_cor <- subset(as.data.frame(index) , row <= col)
 p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_cor[,2]])
 
 ## Final variables selections
-predictors_presence <- c("TM_0_8","UM_0_8","RR_0_8","DRR_0_8","FFM_0_8","RFNO")
+predictors_presence <- c("TM_0_8","UM_0_8","RR_0_8","FFM_0_8")
 
 #### Final data frame for the multivariate analysis
 df_model_presence <- df_model %>%
@@ -73,7 +73,7 @@ df_model_presence <- df_model %>%
 ###########################
 
 ##### First step: select variables for abundance models
-predictors_abundance <- c("TM_0_4","TN_0_4","TX_0_4","UM_0_4","RR_0_4","DRR_0_4","FFM_0_4","RFNO")
+predictors_abundance <- c("TM_0_4","TN_0_5","TX_0_4","UM_0_11","RR_1_5","DRR_0_4","FFM_0_1")
 
 
 df_model_abundance <- df_model %>%
@@ -84,11 +84,11 @@ df_model_abundance <- df_model %>%
 p_ab <- df_model_abundance %>%
   dplyr::select(NB_ALBO_TOT,predictors_abundance, site,Year) %>%
   pivot_longer(-c("NB_ALBO_TOT","site","Year")) %>%
-  ggplot(aes(y = NB_ALBO_TOT, x = value, group = site, color = site)) +
+  ggplot(aes(y = NB_ALBO_TOT, x = value)) +
   geom_point() +
-  geom_smooth(se = F) +
+  geom_smooth(se = T) +
   ylim(c(0,80)) +
-  facet_wrap(name~Year, scales = "free_x") +
+  facet_wrap(.~name, scales = "free_x") +
   theme_bw() +
   ggtitle("Abondance albo ~ variables séléctionnées")
 
@@ -102,7 +102,7 @@ p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_
 
 
 ## Final variables selections
-predictors_abundance <- c("TM_0_4","UM_0_4","RR_0_4","DRR_0_4","FFM_0_4","RFNO")
+predictors_abundance <- c("TM_0_4","UM_0_4","RR_0_4","FFM_0_4")
 
 
 #### Final data frame for the multivariate analysis
@@ -140,7 +140,7 @@ tr = trainControl(method="cv", ## Definition of method sampling: cross validatio
 
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the ROC
-mod_presence <- caret::train(x = df_model_presence[,predictors_presence], y = df_model_presence$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
+mod_presence <- caret::train(x = df_model_presence[,predictors_presence], y = df_model_presence$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"), importance = "permutation")
 
 
 #### Last step: to put predictions on same data frame
@@ -165,15 +165,24 @@ cv_col <- "Year"
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance, spacevar = cv_col,k = length(unique(unlist(df_model_abundance[,cv_col]))))
 
+
 ## Optimising the various model parameters: finding them as a function of predictive power, in relation to a predictive value (ROC, MAE, etc)
+
+spearmcor <- function(data,lev = NULL,model = NULL) {
+  out <- cor(x = data$pred, y = data$obs)
+  names(out) <- "spearman"
+  out
+}
+
 tr = trainControl(method="cv",
                   index = indices_cv$index,
                   indexOut = indices_cv$indexOut,
-                  savePredictions = 'final')
+                  savePredictions = 'final',
+                  summaryFunction = spearmcor)
 
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE
-mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
+mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"), importance = "permutation")
 
 #### Last step: to put predictions on same data frame
 df_model_abundance$rowIndex <- seq(1,nrow(df_model_abundance),1)
@@ -222,9 +231,10 @@ saveRDS(res_multiv_model_presence_explanatory,"res_multiv_model_presence_explana
 # abundance
 
 tr = trainControl(method="none",
-                  savePredictions = 'final')
+                  savePredictions = 'final',
+                  summaryFunction = spearmcor)
 
-mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 1, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
+mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 1, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
 
 
 df_cv_abundance <- predict(mod_abundance)  %>%

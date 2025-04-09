@@ -7,20 +7,24 @@ pieges_data <- read.csv( file.path("data","processed","df_pieges.csv")) %>%
   mutate(effectif_jour = as.numeric(effectif_jour)) %>%
   mutate(year = factor(year, levels = c("2023", "2024")))
 
-# df_meteofrance_historique <- read.csv("data/processed/data_meteofrance_historique.csv") %>%
-#   group_by(year, week) %>%
-#   summarise(RFD = sum(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
-#   group_by(week) %>%
-#   summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TMIN = mean(TMIN, na.rm = T), TMAX = mean(TMAX, na.rm = T)) %>%
-#   mutate(RFDcum = cumsum(RFD)) %>%
-#   mutate(year = "moy. 1950-2022")
-#
-#
+ df_meteofrance_historique <- read.csv("data/processed/data_meteofrance_historique.csv") %>%
+   rename(site = nom_commune) %>%
+   mutate( week = week(date), month = month(date), year = year(date)) %>%
+   group_by(site, year, week) %>%
+   summarise(RFD = sum(RR, na.rm = T), TMN = mean(TM, na.rm = T), TN = mean(TN, na.rm = T), TX = mean(TX, na.rm = T), UM = mean(UM, na.rm = T)) %>%
+   group_by(site, week) %>%
+   summarise(RFD = mean(RFD, na.rm = T), TMN = mean(TMN, na.rm = T), TN = mean(TN, na.rm = T), TX = mean(TX, na.rm = T), UM = mean(UM, na.rm = T)) %>%
+   mutate(RFDcum = cumsum(RFD)) %>%
+   mutate(year = "moy. 1950-2022") %>%
+   ungroup()
+
+
 
 df_meteofrance_2023_2024 <- read.csv(file.path("data","processed","data_meteofrance_2022_2024.csv")) %>%
   mutate( week = week(date), month = month(date), year = year(date)) %>%
   group_by(nom_commune, week, year) %>%
   summarise(RFD = sum(RR, na.rm = T), TMN = mean(TM, na.rm = T), TN = mean(TMN, na.rm = T), TX = mean(TX, na.rm = T), UM = mean(UM, na.rm = T)) %>%
+  group_by(nom_commune, week) %>%
   mutate(RFDcum = cumsum(RFD)) %>%
   mutate(year = as.character(year)) %>%
   ungroup() %>%
@@ -155,9 +159,14 @@ df <- df_meteofrance_2023_2024 %>%
   left_join(pieges_data, by = c("year","week","site")) %>%
   filter(year %in% c(2023, 2024)) %>%
   mutate(date = as.Date(paste(year, week, 1, sep="-"), "%Y-%U-%u")) %>%
-  mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" )))
+  mutate(site = fct_relevel(site, c("PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" )))
 
 df <- df %>% filter(site %in% c("PEROLS","MURVIEL-LES-MONTPELLIER","SAINT-MEDARD-EN-JALLES","BAYONNE"))
+
+df_meteofrance_historique <- df_meteofrance_historique %>%
+  mutate(site = fct_relevel(site, c("PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" ))) %>%
+  filter(site %in% c("PEROLS","MURVIEL-LES-MONTPELLIER","SAINT-MEDARD-EN-JALLES","BAYONNE"))
+
 
 # Scaling factor for mosquito abundance (adjust as needed)
 scaleFactor <- 0.6
@@ -185,32 +194,90 @@ ggplot(df, aes(x = date)) +
   theme_light() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         legend.position = "bottom") +
-  facet_wrap(.~site) +
+  facet_wrap(.~site, nrow = 4, ncol = 1) +
   geom_label(data= dates_init, aes(label=week, xintercept = date, y = 4))
 
 
 
 
+df <- df %>%
+  mutate(TMN = ifelse(week %% 2 ==0, TMN, NA))%>%
+  mutate(RDF = ifelse(week %% 2 ==0, RFD, NA))
 
+#df <- df %>% mutate(RFD = ifelse(year==2024, -RFD, RFD))
 
+scaleFactor = 0.6
 
+# Clean color palette for years
+year_colors <- c("2023" = "#1f77b4", "2024" = "#ff7f0e")  # Adjust as needed
 
-ggplot(df, aes(x = week, group = as.factor(year), colour = as.factor(year))) +
-  #geom_col(aes(y = RFD), position = "dodge", alpha = 0.6) +  # Rainfall as bars
-  geom_line(aes(y = TMN), size = 0.5) +  # Temperature as line
-  geom_point(aes(y = effectif_jour * scaleFactor)) +
-  geom_line(data=df[!is.na(df$effectif_jour),], aes(y = effectif_jour * scaleFactor), size = 0.5) +  # Scaled mosquito abundance
+ggplot(df, aes(x = week)) +
+  # Rainfall bars
+  geom_col(aes(y = RFD, fill = as.factor(year)),position = "dodge", alpha = 0.2, width = 0.6) +
+  # Temperature line (dashed)
+  ggalt::geom_xspline(aes(y = TMN, colour = as.factor(year)),size = 0.8, alpha = 0.7, linetype = "longdash") +
+  # Mosquito abundance: line + points (scaled)
+  geom_point(aes(y = effectif_jour * scaleFactor, colour = as.factor(year)), shape = 16, size = 1.5, alpha = 0.7) +
+  ggalt::geom_xspline(data = df[!is.na(df$effectif_jour), ],
+            aes(y = effectif_jour * scaleFactor, colour = as.factor(year)),
+            size = 0.6) +
+  # Historical temperature line
+  #geom_xspline(data = df_meteofrance_historique, aes(x = week, y = TMN), color = "black", alpha = 0.4, size = 0.6, linetype = "longdash") +
+  # Y-axis settings
   scale_y_continuous(
-    name = "Temperature (°C)",
-    limits = c(0,50),
-    sec.axis = sec_axis(~ . / scaleFactor, name = "Mosquito Abundance (scaled)")  # Secondary axis for mosquito counts
+    name = "Temperature (°C) / Rainfall (mm)",
+    limits = c(0, 60),
+    sec.axis = sec_axis(~ . / scaleFactor, name = "Mosquito Abundance")
   ) +
-  scale_fill_manual(values = cbp1, name = "Collectes Oeufs") +
-  labs(x = "Date", color = "Legend") +
-  theme_light() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position = "bottom") +
-  facet_wrap(.~site)
+  # Manual color/fill for clarity
+  scale_color_manual(name = "Year", values = year_colors) +
+  scale_fill_manual(name = "Year", values = year_colors) +
+  # Theme and axis tweaks
+  labs(x = "Week") +
+  theme_light(base_size = 11) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  # Facet by site
+  facet_wrap(~ site, ncol = 2)
+
+
+
+
+
+ scaleFactor = 0.6
+ ggplot(df, aes(x = week, group = as.factor(year))) +
+   geom_line(aes(y = RFD, fill = as.factor(year)), position = "dodge", alpha = 0.4, width = 0.5) +  # Rainfall as bars
+   geom_line(aes(y = TMN, colour = as.factor(year)), size = 0.6, alpha = 0.8) +  # Temperature as line
+   geom_point(aes(y = effectif_jour * scaleFactor, colour = as.factor(year))) +
+   geom_line(data=df[!is.na(df$effectif_jour),], aes(y = effectif_jour * scaleFactor,  colour = as.factor(year)), size = 0.6) +  # Scaled mosquito abundance
+   geom_line(data = df_meteofrance_historique, aes(x = week,y = TMN), color = "black", alpha = 0.6,  size = 0.6) +
+   scale_y_continuous(
+     name = "Temperature (°C)",
+     limits = c(0,60),
+     sec.axis = sec_axis(~ . / scaleFactor, name = "Mosquito Abundance (scaled)")  # Secondary axis for mosquito counts
+   ) +
+   labs(x = "Date", color = "Legend") +
+   theme_light() +
+   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+         legend.position = "bottom") +
+   facet_wrap(.~site, ncol = 2, nrow = 2)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -34,7 +34,7 @@ df_model <- df_model %>%
 
 
 ##### First step: to select variables for presence models
-predictors_presence<- c("TM_3_8","TN_3_8","TX_3_8","UM_3_8","RR_3_8","DRR_3_8","FFM_3_8")
+predictors_presence <- c("TM_3_8","TN_3_8","TX_3_8","UM_5_11","RR_7_8","FFM_3_8")
 
 #### Final data frame for the multivariate analysis
 df_model_presence <- df_model %>%
@@ -50,7 +50,8 @@ df_model_presence <- df_model %>%
 ###########################
 
 ##### First step: select variables for abundance models
-predictors_abundance <- c("TM_3_8","TN_3_8","TX_3_8","UM_3_8","RR_3_8","DRR_3_8","FFM_3_8")
+#predictors_abundance <- c("TM_3_8","TN_3_8","TX_3_8","UM_3_8","RR_3_8","FFM_3_8")
+predictors_abundance <- c("TM_3_8","TN_3_8","TX_3_8","UM_3_11","RR_3_5","FFM_3_8")
 
 #### Final data frame for the multivariate analysis
 df_model_abundance <- df_model %>%
@@ -103,15 +104,22 @@ saveRDS(res_multiv_model_presence,"res_multiv_model_presence_forecasting_llo.rds
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance, spacevar = cv_col,k = length(unique(unlist(df_model_abundance[,cv_col]))))
 
+spearmcor <- function(data,lev = NULL,model = NULL) {
+  out <- cor(x = data$pred, y = data$obs)
+  names(out) <- "spearman"
+  out
+}
+
 ## Optimising the various model parameters: finding them as a function of predictive power, in relation to a predictive value (ROC, MAE, etc)
 tr = trainControl(method="cv",
                   index = indices_cv$index,
                   indexOut = indices_cv$indexOut,
-                  savePredictions = 'final')
+                  savePredictions = 'final',
+                  summaryFunction = spearmcor)
 
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE
-mod_abundance <- CAST::ffs(predictors = df_model_abundance[,predictors_abundance], response = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE", maximize = FALSE,  preProcess = c("center","scale"))
+mod_abundance <- CAST::ffs(predictors = df_model_abundance[,predictors_abundance], response = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"))
 
 #### Last step: to put predictions on same data frame
 df_model_abundance$rowIndex <- seq(1,nrow(df_model_abundance),1)
