@@ -172,10 +172,10 @@ univ_spearman_temporal_mf <- corr_univ_presence %>%
 plots_univ_spearman_temporal_mf <- univ_spearman_temporal_mf %>%
   arrange(rev(indicator),factor(var, levels = c("TM","TN","TX","TAMPLI","GDDjour","GDDacc","GDDbound","UM","RR","RRMAX","DRR","FFM","FXY")),factor(site, levels = c("TOUS SITES", "MURVIEL-LES-MONTPELLIER", "PEROLS" ,"BAYONNE","SAINT-MEDARD-EN-JALLES"))) %>%
   #arrange(rev(indicator),factor(var, levels = c("TM","TN","TX","TAMPLI","GDDjour","GDDacc","GDDbound","UM","RR","RRMAX","DRR","FFM","FXY")),factor(environment, levels = c("MEDITERRANEAN","ATLANTIC"))) %>%
-  dplyr::filter(!var %in% c("GDDjour","GDDacc","GDDbound","TAMPLI","FXY","DRR")) %>%
+  dplyr::filter(!var %in% c("GDDjour","GDDacc","GDDbound","TAMPLI","FXY","DRR","RRMAX")) %>%
   mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1]))) %>%
   nest(-c(site,indicator)) %>%
-  mutate(univ_temporal = map(data, ~patchwork::wrap_plots(.x$univ_temporal, nrow = 1, ncol = 7))) %>%
+  mutate(univ_temporal = map(data, ~patchwork::wrap_plots(.x$univ_temporal, nrow = 1, ncol = 6))) %>%
   mutate(univ_temporal = pmap(list(univ_temporal,site), ~..1 + patchwork::plot_annotation(title = ..2))) %>%
   dplyr::select(-data)
 

@@ -50,8 +50,7 @@ df_model_presence <- df_model %>%
 ###########################
 
 ##### First step: select variables for abundance models
-#predictors_abundance <- c("TM_3_8","TN_3_8","TX_3_8","UM_3_8","RR_3_8","FFM_3_8")
-predictors_abundance <- c("TM_3_8","TN_3_8","TX_3_8","UM_3_11","RR_3_5","FFM_3_8")
+predictors_abundance <- c("TM_3_8","TN_3_8","TX_3_8","UM_3_8","RR_3_8","FFM_3_8")
 
 #### Final data frame for the multivariate analysis
 df_model_abundance <- df_model %>%

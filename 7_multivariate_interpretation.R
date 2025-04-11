@@ -95,12 +95,9 @@ df <- df_cv_andrea %>%
   left_join(df_cv_paul) %>%
   filter(site!="RENNES")
 
-df <- df %>%
-  add_row(site = "BAYONNE", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA, pred_stat_forecasting = NA) %>%
-  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA, pred_stat_forecasting = NA)
-
-
 df %>%
+  add_row(site = "BAYONNE", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA, pred_stat_forecasting = NA) %>%
+  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA, pred_stat_forecasting = NA) %>%
   rename(obs_mathematical = obs) %>%
   mutate(obs_statistical = obs_mathematical) %>%
   group_by(site) %>%
@@ -116,7 +113,8 @@ df %>%
   ggplot(aes(x = date, y = value, color = name, group = name, size = ifelse(name %in% c("obs_mathematical","obs_statistical"), 0.6, 0.5))) +
   geom_line() +
   geom_point(size = 0.5) +
-  ggh4x::facet_grid2(cols = vars(model), rows = vars(site), scales = "free_y", independent = "y") +
+  #ggh4x::facet_grid2(cols = vars(model), rows = vars(site), scales = "free_y", independent = "y") +
+  facet_grid(cols = vars(site), rows = vars(model), scales = "free_y") +
  scale_color_manual(values = c(
     "obs_mathematical" = "#49423c",  # Observed values in black
     "obs_statistical" = "#49423c",  # Observed values in black
@@ -151,6 +149,17 @@ df %>%
 
 
 ### calculer courbes AUC #####
+# code to compute the ROC AUC of Metelmann predicitons
+
+library(pROC)
+
+df %>%
+  mutate(obs = ifelse(obs==0, 0, 1)) %>%
+  pivot_longer(-c('site', 'Year', 'week',"obs")) %>%
+  group_by(name,site) %>%
+  summarise(auc = as.numeric(auc(obs, value)))
+
+
 
 
 ## obs vs pred values
@@ -206,7 +215,7 @@ vis_abundance <- data.frame()
 for(i in 1:length(sites)){
 
   th_vis_presence <- vi(model_presence_nowcasting, method = "permute", train = df_mod_presence_nowcasting %>% dplyr::filter(site==sites[i]), target = "PRES_ALBO", metric = "roc_auc",pred_wrapper = pfun_presence, nsim = 30, event_level = 'first', feature_names = model_presence_nowcasting$finalModel$xNames)
-  th_vis_abundance <- vi(model_abundance_nowcasting, method = "permute", train = df_mod_abundance_nowcasting %>% dplyr::filter(site==sites[i]), target = "NB_ALBO_TOT", metric = "mae",pred_wrapper = pfun_abundance, nsim = 30, feature_names = model_abundance_nowcasting$finalModel$xNames)
+  th_vis_abundance <- vi(model_abundance_nowcasting, method = "permute", train = df_mod_abundance_nowcasting %>% dplyr::filter(site==sites[i]), target = "NB_ALBO_TOT", metric = "rsq",pred_wrapper = pfun_abundance, nsim = 30, feature_names = model_abundance_nowcasting$finalModel$xNames)
 
   th_vis_presence$site = sites[i]
   th_vis_abundance$site = sites[i]
@@ -226,19 +235,22 @@ vis_abundance <- vis_abundance %>%
   mutate(model = "Abundance") %>%
   mutate(Variable = fct_relevel(Variable, c("TM_0_4","UM_0_4","RR_0_4","FFM_0_4")))
 
-p1 <- ggplot(vis_presence, aes(x = Variable, y = Importance)) +
+vip_presence <- ggplot(vis_presence, aes(x = Variable, y = Importance, fill = site)) +
   geom_bar(position="dodge", stat="identity") +
   theme_bw() +
-  facet_wrap(.~site) +
-  ggtitle("Presence model")
+  ggtitle("Presence model") +
+  theme(legend.position = "none",
+        axis.title.x=element_blank()) +
+  scale_x_discrete(guide = guide_axis(angle = 45))
 
-p2 <- ggplot(vis_abundance, aes(x = Variable, y = Importance)) +
+vip_abundance <- ggplot(vis_abundance, aes(x = Variable, y = Importance, fill = site)) +
   geom_bar(position="dodge", stat="identity") +
   theme_bw() +
-  facet_wrap(.~site) +
-  ggtitle("Abundance model")
+  ggtitle("Abundance model") +
+  theme(legend.position = "none",
+        axis.title.x=element_blank()) +
+  scale_x_discrete(guide = guide_axis(angle = 45))
 
-wrap_plots(p1, p2) + plot_annotation(title = "VIP")
 
 
 ### partial dependence plot
@@ -250,7 +262,7 @@ pred_wrapper_classif <- function(object, newdata) {
   c("avg" = mean(p))
 }
 
-pdps <- list()
+pdps_presence <- list()
 
 variables_presence <- as.character(unique(vis_presence$Variable))
 
@@ -274,16 +286,23 @@ for(i in 1:length(variables_presence)){
 
   pd$yhat[which(pd$yhat<0)] <-0
 
-  pdps[[i]] <- ggplot() +
+  pdps_presence[[i]] <- ggplot() +
     geom_line(data=pd, aes_string(x=variables_presence[i], y="yhat", group = "site", color = "site")) +
     geom_rug(data=df_mod_presence_nowcasting, aes_string(x = variables_presence[i]), sides="b") +
     theme_bw() +
     ylim(c(0,1)) +
-    ylab("Presence probability")
+    ylab("Presence probability") +
+    theme(legend.position = "none",
+          axis.text.y=element_text(size=7))
+
+
+  if(i > 1){
+    pdps_presence[[i]] <- pdps_presence[[i]] +  theme(axis.title.y = element_blank())
+  }
 
 }
 
-plot_pdps_presence <- patchwork::wrap_plots(pdps, ncol = 4) + plot_annotation(title = "Presence model : PDP") + plot_layout(guides = "collect") & theme(legend.position='bottom')
+plot_pdps_presence <- patchwork::wrap_plots(pdps_presence[[1]],pdps_presence[[2]],pdps_presence[[4]],pdps_presence[[3]], ncol = 4) + plot_annotation(title = "Presence model : PDP") + plot_layout(guides = "collect")
 
 
 
@@ -295,7 +314,7 @@ pred_wrapper_reg <- function(object, newdata) {
 }
 
 
-pdps <- list()
+pdps_abundance <- list()
 
 variables_abundance <- as.character(unique(vis_abundance$Variable))
 
@@ -319,37 +338,73 @@ for(i in 1:length(variables_abundance)){
   pd$yhat[which(pd$yhat<0)] <-0
   pd$yhat <- exp(pd$yhat)
 
-  pdps[[i]] <- ggplot() +
+  pdps_abundance[[i]] <- ggplot() +
     geom_line(data=pd, aes_string(x=variables_abundance[i], y="yhat", group = "site", color = "site")) +
     geom_rug(data=df_mod_abundance_nowcasting, aes_string(x = variables_abundance[i]), sides="b") +
     theme_bw() +
     ylim(c(0,35)) +
-    ylab("Abundance")
+    ylab("Abundance") +
+    theme(axis.text.y=element_text(size=7))
+
+  if(i > 1){
+    pdps_abundance[[i]] <- pdps_abundance[[i]] +  theme(axis.title.y = element_blank())
+  }
 
 }
 
-plot_pdps_abundance <- patchwork::wrap_plots(pdps, ncol = 4) + plot_annotation(title = "Abundance model : PDP") + plot_layout(guides = "collect") & theme(legend.position='bottom')
+plot_pdps_abundance <- patchwork::wrap_plots(pdps_abundance, ncol = 4) + plot_annotation(title = "Abundance model : PDP") + plot_layout(guides = "collect") & theme(legend.position='bottom')
 
 
+(vip_presence + plot_pdps_presence  + plot_layout(widths = c(1, 5))) / (vip_abundance + plot_pdps_abundance  + plot_layout(widths = c(1, 5)))
 
 
-# interaction rain and temperature
+######
+# abundance : TMAX
+######
+
+multiv_model_abundance_nowcasting_tmax <- readRDS("res_multiv_model_abundance_nowcasting_tmax.rds")
+
+model_abundance_nowcasting_tmax <- multiv_model_abundance_nowcasting_tmax[[1]] #### sum up of abundance model
+df_cv_abundance_nowcasting_tmax <- multiv_model_abundance_nowcasting_tmax[[2]] #### data frame with prediction
+df_mod_abundance_nowcasting_tmax <- multiv_model_abundance_nowcasting_tmax[[3]] #### data frame which was used to build the model
+
+pd <- data.frame()
+for(j in 1:length(sites)){
+  th_pd <- pdp::partial(model_abundance_nowcasting_tmax, pred.var = "TX_0_4", pred.fun = pred_wrapper_reg, train = df_mod_abundance_nowcasting_tmax %>% filter(site==sites[j])) ## array that returns predictions of a variable in a model
+  th_pd$site <- sites[j]
+  pd <- rbind(pd,th_pd)
+}
+pd$yhat[which(pd$yhat<0)] <-0
+pd$yhat <- exp(pd$yhat)
+
+ ggplot() +
+  geom_line(data=pd, aes_string(x="TX_0_4", y="yhat", group = "site", color = "site")) +
+  geom_rug(data=df_mod_abundance_nowcasting_tmax, aes_string(x = "TX_0_4"), sides="b") +
+  theme_bw() +
+  ylim(c(0,35)) +
+  theme(axis.text.y=element_text(size=7),
+        axis.title.y = element_blank())
+
+
+# abundance : interaction rain and temperature
 
 th_pd <- pdp::partial(model_abundance_nowcasting, pred.var = c("TM_0_4","RR_0_4"), pred.fun = pred_wrapper_reg, train = df_mod_abundance_nowcasting) ## array that returns predictions of a variable in a model
 th_pd$yhat = exp(th_pd$yhat)
-pdp::plotPartial(th_pd, rug = T, train = df_mod_abundance_nowcasting)
+#p=pdp::plotPartial(th_pd, rug = T, train = df_mod_abundance_nowcasting)
 
-ggplot() +
+pdp_interaction_abundance <- ggplot() +
   geom_tile(data = th_pd, aes(x = TM_0_4, y = RR_0_4, fill = yhat)) +
-  geom_point(data = df_mod_abundance_nowcasting, aes(x=TM_0_4, y=RR_0_4)) +
-  scale_fill_viridis_b(n.breaks=20, limits = c(0,max(th_pd$yhat))) +
-  labs(x = "TM_0_4", y = "RR_0_4", fill = "abundance") +
-  theme_classic()
+  geom_point(data = df_mod_abundance_nowcasting, aes(x=TM_0_4, y=RR_0_4, size = exp(NB_ALBO_TOT)), shape = 1) +
+  scale_fill_viridis_b(n.breaks = 18, labels = c("Lowest",rep("",16),"Highest")) +
+  labs(x = "Average temperature\nover the month preceding collection (°C)", y = "Cumulative rainfall\nover the month preceding collection (mm)", fill = "Predicted\nabundance", size = "Observed\nabundance") +
+  theme_classic() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0))
 
 
-ggplot(th_pd, aes(TM_0_4, RR_0_4)) +
-  geom_raster(aes(fill = yhat), interpolate = TRUE) +
-  scale_fill_viridis_b(n.breaks=30)
+
+
+
 
 
 ########################s
@@ -436,6 +491,7 @@ bayonne <- fun_get_lime("BAYONNE")
 murviel <- fun_get_lime("MURVIEL-LES-MONTPELLIER")
 medard <- fun_get_lime("SAINT-MEDARD-EN-JALLES")
 
+
 plot_lime <- function(explanation){
 
   explanation <- explanation %>%
@@ -444,26 +500,80 @@ plot_lime <- function(explanation){
                                grepl("site", feature) ~ "site",
                                grepl("RR", feature) ~ "Rainfall",
                                grepl("FFM", feature) ~ "Wind")) %>%
-    mutate(feature_char = fct_relevel(feature_char, rev(c("Rainfall","Temperature","Humidity","Wind","site"))))
-
+    mutate(feature_char = fct_relevel(feature_char, rev(c("Temperature","Rainfall","Humidity","Wind","site")))) %>%
+    filter(feature_char!="site") %>%
+    mutate(feature_weight = ifelse(feature_weight < -2.5, -2.5 ,feature_weight))
 
   explanation$feature_desc <- factor(explanation$feature_desc,levels = unique(explanation$feature_desc[order(as.numeric(explanation$feature_value))]))
 
 
-  p1 <- ggplot(explanation, aes_(~date, ~feature_desc)) +
+  p1 <- ggplot(explanation, aes_(~date, ~feature_char)) +
     geom_tile(aes_(fill = ~feature_weight)) +
     scale_y_discrete("Feature",expand = c(0, 0)) +
-    scale_fill_gradient2("Feature\nweight",low = "firebrick", mid = "#f7f7f7", high = "steelblue",  limit = c(-2,2.5)) +
+    #scale_fill_gradient2("Feature weight",low = "firebrick", mid = "#f7f7f7", high = "steelblue",  limit = c(-2,2.5), n.breaks = 5, labels = c("Important - reduce","","no weight","","Important - raises")) +
+    scale_fill_gradientn(
+      name = "Feature contribution",
+      colours = c("firebrick", "#f7f7f7", "steelblue"),
+      values = scales::rescale(c(-2.5, -0.5, 0, 0.5, 2.5)),  # non-linear steps
+      limits = c(-2.5, 2.5),
+      breaks = c(-2, -0.4, 0, 0.4, 2),
+      labels = c("Important - positive", "", "no contribution", "", "Important - negative")
+    ) +
     theme_light() +
-    facet_grid(rows = vars(feature_char), space="free", scales = "free_y") +
+    #facet_grid(rows = vars(feature_char), space="free", scales = "free_y") +
    theme(panel.border = element_rect(fill = NA,colour = "grey60", size = 1),
-                         panel.grid = element_blank(),
-                         legend.position = "right")
+         panel.grid = element_blank(),
+         legend.position = "right",
+         axis.title.y = element_blank(),
+         axis.title.x = element_blank(),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.text=element_text(size=9),
+         text = element_text(size=10)
+   )
 
 
   return(p1)
 }
 
+
+
+df_cv_paul <- df_cv_paul %>%
+  mutate(date = as.Date(paste(Year, week, 1, sep="-"), "%Y-%U-%u"))  %>%
+  add_row(site = "BAYONNE", Year = 2024, week = 1, pred_stat_nowcasting = 1000, pred_stat_forecasting = NA) %>%
+  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, pred_stat_nowcasting = 1000, pred_stat_forecasting = NA)
+
+
+scaleFactor = 0.6
+
+dd_perols <- p_perols +
+  geom_point(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  geom_line(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
+  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#80634C", "Predictions (ML)" = "#1AAFBC"))
+
+dd_murviels <- p_murviels +
+  geom_point(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  geom_line(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
+  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#80634C", "Predictions (ML)" = "#1AAFBC"))
+
+dd_bayonne <- p_bayonne +
+  geom_point(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  geom_line(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
+  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#80634C", "Predictions (ML)" = "#1AAFBC"))
+
+dd_medard <- p_medard +
+  geom_point(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  geom_line(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
+  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#80634C", "Predictions (ML)" = "#1AAFBC"))
+
+
+(
+  (dd_perols + dd_murviels) /
+    (plot_lime(perols) + plot_lime(murviel)) /
+  (dd_bayonne + dd_medard) /
+    (plot_lime(bayonne) + plot_lime(medard))
+) +
+  plot_layout(guides = "collect", heights = c(2, 1, 2, 1))
 
 
 ###########################

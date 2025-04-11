@@ -16,7 +16,7 @@ ign_client <- WFSClient$new(wfs_ign,
                             serviceVersion = "2.0.0")
 
 # liste des couches disponibles :
-ign_client$getFeatureTypes(pretty = TRUE)  # voir aussi ici : https://geoservices.ign.fr/services-geoplateforme-diffusion#nomstechniques
+ign_client$getFeatureTypes(pretty = TRUE)  # voir aussi ici : https://geoservices.ign.fr/services-geoplateforme-diffusion#nomstechniques          https://geoservices.ign.fr/services-web-experts-economie
 
 bbox_perols <- c( bottom = min(df$Latitude[which(df$site == "PEROLS")])-0.002,left = min(df$Longitude[which(df$site == "PEROLS")])-0.002,  top = max(df$Latitude[which(df$site == "PEROLS")])+0.002,right = max(df$Longitude[which(df$site == "PEROLS")])+0.002)
 bbox_murviel <- c( bottom = min(df$Latitude[which(df$site == "MURVIEL-LES-MONTPELLIER")])-0.002, left = min(df$Longitude[which(df$site == "MURVIEL-LES-MONTPELLIER")])-0.002,  top = max(df$Latitude[which(df$site == "MURVIEL-LES-MONTPELLIER")])+0.002, right = max(df$Longitude[which(df$site == "MURVIEL-LES-MONTPELLIER")])+0.002)

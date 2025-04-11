@@ -182,14 +182,14 @@ dates_init <- df %>%
 ggplot(df, aes(x = date)) +
   geom_col(aes(y = RFD), fill = "lightblue", alpha = 0.6) +  # Rainfall as bars
   geom_line(aes(y = TMN, color = "Temperature"), size = 0.5) +  # Temperature as line
-  geom_point(aes(y = effectif_jour * scaleFactor,  color = "Mosquito Abundance")) +
-  geom_line(data=df[!is.na(df$effectif_jour),], aes(y = effectif_jour * scaleFactor, color = "Mosquito Abundance"), size = 0.5) +  # Scaled mosquito abundance
+  geom_point(aes(y = effectif_jour * scaleFactor,  color = "Eggs per trap")) +
+  geom_line(data=df[!is.na(df$effectif_jour),], aes(y = effectif_jour * scaleFactor, color = "Eggs per trap"), size = 0.5) +  # Scaled mosquito abundance
    scale_y_continuous(
      name = "Temperature (°C) / Rainfall (mm)",
      limits = c(0,50),
-     sec.axis = sec_axis(~ . / scaleFactor, name = "Mosquito Abundance (scaled)")  # Secondary axis for mosquito counts
+     sec.axis = sec_axis(~ . / scaleFactor, name = "Eggs per trap")  # Secondary axis for mosquito counts
    ) +
-  scale_color_manual(values = c("Temperature" = "blue", "Mosquito Abundance" = "red")) +  # Custom colors
+  scale_color_manual(values = c("Temperature" = "blue", "Eggs per trap" = "red")) +  # Custom colors
   labs(x = "Date", color = "Legend") +
   theme_light() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -197,6 +197,45 @@ ggplot(df, aes(x = date)) +
   facet_wrap(.~site, nrow = 4, ncol = 1) +
   geom_label(data= dates_init, aes(label=week, xintercept = date, y = 4))
 
+
+# plot by site
+
+fun_plot_by_site <- function(th_site){
+
+df2 = df %>%
+  mutate(effectif_jour=ifelse(site=="BAYONNE" & week==1 & year==2024, 1000, effectif_jour)) %>%
+  mutate(effectif_jour=ifelse(site=="SAINT-MEDARD-EN-JALLES" & week==1 & year==2024, 1000, effectif_jour)) %>%
+  filter(site==th_site)
+
+p_th_site <- ggplot(df2, aes(x = date)) +
+  geom_col(aes(y = RFD), fill = "lightblue", alpha = 0.6) +  # Rainfall as bars
+  geom_line(aes(y = TMN, color = "Temperature"), size = 0.5) +  # Temperature as line
+  geom_point(aes(y = effectif_jour * scaleFactor,  color = "Eggs/trap"), size = 0.7) +
+  geom_line(data=df2[!is.na(df2$effectif_jour),], aes(y = effectif_jour * scaleFactor, color = "Eggs/trap"), size = 0.5) +  # Scaled mosquito abundance
+  scale_y_continuous(
+    name = "T°/Rain",
+    limits = c(0,60),
+    sec.axis = sec_axis(~ . / scaleFactor, name = "Eggs/trap")  # Secondary axis for mosquito counts
+  ) +
+  scale_color_manual(labels = c("Observations","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "darkgrey")) +  # Custom colors
+  labs(x = "Date", color = "Legend") +
+  theme_light() +
+  ggtitle(th_site) +
+  theme(legend.position = "right",
+        legend.title = element_blank(),
+        axis.title.x = element_blank(),
+        text = element_text(size=10),
+        plot.title = element_text(size=10)
+        )
+
+return(p_th_site)
+
+}
+
+p_perols <- fun_plot_by_site("PEROLS")
+p_murviels <- fun_plot_by_site("MURVIEL-LES-MONTPELLIER")
+p_bayonne <- fun_plot_by_site("BAYONNE")
+p_medard <- fun_plot_by_site("SAINT-MEDARD-EN-JALLES")
 
 
 
@@ -213,21 +252,21 @@ year_colors <- c("2023" = "#1f77b4", "2024" = "#ff7f0e")  # Adjust as needed
 
 ggplot(df, aes(x = week)) +
   # Rainfall bars
-  geom_col(aes(y = RFD, fill = as.factor(year)),position = "dodge", alpha = 0.2, width = 0.6) +
+  geom_col(aes(y = RFD, fill = as.factor(year)),position = "dodge", alpha = 0.4, width = 0.6) +
   # Temperature line (dashed)
-  ggalt::geom_xspline(aes(y = TMN, colour = as.factor(year)),size = 0.8, alpha = 0.7, linetype = "longdash") +
+  ggalt::geom_xspline(aes(y = TMN, colour = as.factor(year)),size = 0.8, alpha = 0.7) +
   # Mosquito abundance: line + points (scaled)
-  geom_point(aes(y = effectif_jour * scaleFactor, colour = as.factor(year)), shape = 16, size = 1.5, alpha = 0.7) +
+  geom_point(aes(y = effectif_jour * scaleFactor, colour = as.factor(year)), shape = 16, size = 1.8, alpha = 0.7) +
   ggalt::geom_xspline(data = df[!is.na(df$effectif_jour), ],
             aes(y = effectif_jour * scaleFactor, colour = as.factor(year)),
-            size = 0.6) +
+            size = 1) +
   # Historical temperature line
   #geom_xspline(data = df_meteofrance_historique, aes(x = week, y = TMN), color = "black", alpha = 0.4, size = 0.6, linetype = "longdash") +
   # Y-axis settings
   scale_y_continuous(
     name = "Temperature (°C) / Rainfall (mm)",
     limits = c(0, 60),
-    sec.axis = sec_axis(~ . / scaleFactor, name = "Mosquito Abundance")
+    sec.axis = sec_axis(~ . / scaleFactor, name = "Eggs per trap")
   ) +
   # Manual color/fill for clarity
   scale_color_manual(name = "Year", values = year_colors) +
@@ -348,15 +387,15 @@ df_meteofrance <- rbind(df_meteofrance_historique,df_meteofrance_2023_2024,df_me
 
 df_pieges2 <- df_pieges %>%
   ungroup() %>%
-  mutate(effectif_jour_mean = scales::rescale(effectif_jour_mean, to=c(0,1))) %>%
+  #mutate(effectif_jour_mean = scales::rescale(effectif_jour_mean, to=c(0,1))) %>%
   dplyr::select(-effectif_jour_sd) %>%
   pivot_wider(names_from = year, values_from = effectif_jour_mean) %>%
   rename(effectif_jour_2023=`2023`,effectif_jour_2024=`2024`)
 
 df_meteofrance2 <- df_meteofrance %>%
   ungroup() %>%
-  pivot_wider(names_from = year, values_from = c(RFD ,  TMN,  TMIN,  TMAX, RFDcum )) %>%
-  mutate_at(3:ncol(.), funs(c(scales::rescale(., to=c(0,1)))))
+  pivot_wider(names_from = year, values_from = c(RFD ,  TMN,  TMIN,  TMAX, RFDcum )) #%>%
+  #mutate_at(3:ncol(.), funs(c(scales::rescale(., to=c(0,1)))))
 
 
 df2 <- df_meteofrance2 %>%

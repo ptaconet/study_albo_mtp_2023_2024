@@ -192,6 +192,7 @@ df_cv_abundance <- mod_abundance$pred %>%
 
 res_multiv_model_abundance_nowcasting <- list(model = mod_abundance, df_cv = df_cv_abundance, df_mod = df_model_abundance) ## to save models, data frame of the model and predictions
 saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcasting.rds")
+#saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcasting_tmax.rds")
 
 
 
