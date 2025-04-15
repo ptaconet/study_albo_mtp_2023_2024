@@ -109,7 +109,7 @@ df %>%
     name %in% c("obs_mathematical","pred_metelmann", "pred_arbocarto") ~ 'Mathematical models',
     name %in% c("obs_statistical", "pred_stat_nowcasting","pred_stat_forecasting") ~ 'Statistical models'  )) %>%
   # Duplicate "obs" so it appears in both "mathematical" and "statistical" facets
-  mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" ))) %>%
+  mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER",  "BAYONNE","SAINT-MEDARD-EN-JALLES" , "RENNES" ))) %>%
   ggplot(aes(x = date, y = value, color = name, group = name, size = ifelse(name %in% c("obs_mathematical","obs_statistical"), 0.6, 0.5))) +
   geom_line() +
   geom_point(size = 0.5) +
@@ -118,11 +118,15 @@ df %>%
  scale_color_manual(values = c(
     "obs_mathematical" = "#49423c",  # Observed values in black
     "obs_statistical" = "#49423c",  # Observed values in black
-    "pred_arbocarto" = "#bc6c25",  # Similar blue for Arbocarto
-    "pred_metelmann" = "#2DD881",  # Slightly different but close blue for Metelman
+    "pred_arbocarto" = "#6a994e",  # Similar blue for Arbocarto
+    "pred_metelmann" = "#a7c957",  # Slightly different but close blue for Metelman
     #"pred_stat_explanatory" = "#E69F00",
-    "pred_stat_nowcasting" = "#E64F90",
-    "pred_stat_forecasting" = "#E69F00"
+    "pred_stat_nowcasting" = "#457b9d",
+    "pred_stat_forecasting" = "#a8dadc"
+    # "pred_arbocarto" = "#bc6c25",  # Similar blue for Arbocarto
+    # "pred_metelmann" = "#2DD881",  # Slightly different but close blue for Metelman
+    # "pred_stat_nowcasting" = "#E64F90",
+    # "pred_stat_forecasting" = "#E69F00"
   ),
   labels = c(
     "obs_mathematical" = "Observations",
@@ -164,6 +168,7 @@ df %>%
 
 ## obs vs pred values
 df %>%
+  mutate(site = fct_relevel(site,c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "BAYONNE", "SAINT-MEDARD-EN-JALLES" ))) %>%
   group_by(site) %>%
   summarise(spearman_metelmann = round(cor(obs, pred_metelmann, method="spearman", use = "complete.obs"),2),
             spearman_arbocarto = round(cor(obs, pred_arbocarto, method="spearman", use = "complete.obs"),2),
@@ -199,7 +204,7 @@ df %>%
 
 library(vip)
 
-sites <- c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE")
+sites <- c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "BAYONNE", "SAINT-MEDARD-EN-JALLES" )
 
 pfun_presence <- function(object, newdata) {
   p <- predict(object, newdata = newdata, type ="prob")[,"Presence"]
@@ -228,28 +233,39 @@ for(i in 1:length(sites)){
 vis_presence <- vis_presence %>%
   mutate(Variable = as.factor(Variable)) %>%
   mutate(model = "Presence") %>%
-  mutate(Variable = fct_relevel(Variable, c("TM_0_8","UM_0_8","RR_0_8","FFM_0_8")))
+  mutate(Variable = fct_relevel(Variable, c("TM_0_8","UM_5_11"))) %>%
+  mutate(site = fct_relevel(site,sites))
 
 vis_abundance <- vis_abundance %>%
   mutate(Variable = as.factor(Variable)) %>%
   mutate(model = "Abundance") %>%
-  mutate(Variable = fct_relevel(Variable, c("TM_0_4","UM_0_4","RR_0_4","FFM_0_4")))
+  mutate(Variable = fct_relevel(Variable, c("TM_0_4","UM_0_11","RR_1_5"))) %>%
+  mutate(site = fct_relevel(site,sites))
 
 vip_presence <- ggplot(vis_presence, aes(x = Variable, y = Importance, fill = site)) +
   geom_bar(position="dodge", stat="identity") +
   theme_bw() +
   ggtitle("Presence model") +
-  theme(legend.position = "none",
-        axis.title.x=element_blank()) +
-  scale_x_discrete(guide = guide_axis(angle = 45))
+  ylab("Variable importance") +
+  theme( axis.title.x=element_blank(),
+        axis.text.y=element_text(size=7),
+        axis.title.y = element_text(size=10)) +
+  scale_x_discrete(guide = guide_axis(angle = 0)) +
+  scale_fill_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7")) +
+  guides(fill="none")
+
 
 vip_abundance <- ggplot(vis_abundance, aes(x = Variable, y = Importance, fill = site)) +
   geom_bar(position="dodge", stat="identity") +
   theme_bw() +
   ggtitle("Abundance model") +
-  theme(legend.position = "none",
-        axis.title.x=element_blank()) +
-  scale_x_discrete(guide = guide_axis(angle = 45))
+  ylab("Variable importance") +
+  theme(axis.title.x=element_blank(),
+        axis.text.y=element_text(size=7),
+        axis.title.y = element_text(size=10)) +
+  scale_x_discrete(guide = guide_axis(angle = 0)) +
+  scale_fill_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7")) +
+  guides(fill="none")
 
 
 
@@ -272,7 +288,7 @@ for(i in 1:length(variables_presence)){
   pd1 <- pdp::partial(model_presence_nowcasting, pred.var = variables_presence[i], pred.fun = pred_wrapper_classif, train = df_mod_presence_nowcasting)
   pd1$site = "average"
 
-  sites <- c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE")
+  sites <- c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "BAYONNE", "SAINT-MEDARD-EN-JALLES" )
 
   pd <- data.frame()
 
@@ -285,24 +301,33 @@ for(i in 1:length(variables_presence)){
   #pd <- rbind(pd1,pd)
 
   pd$yhat[which(pd$yhat<0)] <-0
+  pd$site <- fct_relevel(pd$site, sites)
 
   pdps_presence[[i]] <- ggplot() +
-    geom_line(data=pd, aes_string(x=variables_presence[i], y="yhat", group = "site", color = "site")) +
+    geom_smooth(data=pd, aes_string(x=variables_presence[i], y="yhat", group = "site", color = "site"), se = F, method = "gam", formula = y ~ s(x, bs = "cs"), linewidth = 0.5) +
     geom_rug(data=df_mod_presence_nowcasting, aes_string(x = variables_presence[i]), sides="b") +
     theme_bw() +
     ylim(c(0,1)) +
     ylab("Presence probability") +
+    xlab(paste(variables_presence[i],
+               case_when(grepl("TM|TX",variables_presence[i]) ~ "(°C)",
+                         grepl("UM",variables_presence[i]) ~ "(%)",
+                         grepl("RR",variables_presence[i]) ~ "(mm)"))) +
     theme(legend.position = "none",
-          axis.text.y=element_text(size=7))
+          axis.text.y=element_text(size=7),
+          axis.title.y = element_text(size=10),
+          axis.title.x = element_text(size=10)) +
+    scale_color_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7"))
 
 
-  if(i > 1){
-    pdps_presence[[i]] <- pdps_presence[[i]] +  theme(axis.title.y = element_blank())
-  }
+  # if(i > 1){
+  #   pdps_presence[[i]] <- pdps_presence[[i]] +  theme(axis.title.y = element_blank())
+  # }
 
 }
 
-plot_pdps_presence <- patchwork::wrap_plots(pdps_presence[[1]],pdps_presence[[2]],pdps_presence[[4]],pdps_presence[[3]], ncol = 4) + plot_annotation(title = "Presence model : PDP") + plot_layout(guides = "collect")
+#plot_pdps_presence <- patchwork::wrap_plots(pdps_presence[[1]],pdps_presence[[2]],pdps_presence[[4]],pdps_presence[[3]], ncol = 4) + plot_annotation(title = "Presence model : PDP") + plot_layout(guides = "collect")
+plot_pdps_presence <- patchwork::wrap_plots(pdps_presence) + plot_annotation(title = "Presence model : PDP") + plot_layout(guides = "collect")
 
 
 
@@ -323,7 +348,7 @@ for(i in 1:length(variables_abundance)){
   pd1 <- pdp::partial(model_abundance_nowcasting, pred.var = variables_abundance[i], pred.fun = pred_wrapper_reg, train = df_mod_abundance_nowcasting)
   pd1$site = "average"
 
-  sites <- c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE" )
+  sites <- c( "PEROLS", "MURVIEL-LES-MONTPELLIER",  "BAYONNE" , "SAINT-MEDARD-EN-JALLES")
 
   pd <- data.frame()
 
@@ -337,25 +362,57 @@ for(i in 1:length(variables_abundance)){
 
   pd$yhat[which(pd$yhat<0)] <-0
   pd$yhat <- exp(pd$yhat)
+  pd$site <- fct_relevel(pd$site, sites)
 
   pdps_abundance[[i]] <- ggplot() +
-    geom_line(data=pd, aes_string(x=variables_abundance[i], y="yhat", group = "site", color = "site")) +
+    geom_smooth(data=pd, aes_string(x=variables_abundance[i], y="yhat", group = "site", color = "site"), se = F, method = "gam", formula = y ~ s(x, bs = "cs"), linewidth = 0.5) +
     geom_rug(data=df_mod_abundance_nowcasting, aes_string(x = variables_abundance[i]), sides="b") +
     theme_bw() +
-    ylim(c(0,35)) +
+    ylim(c(0,40)) +
     ylab("Abundance") +
-    theme(axis.text.y=element_text(size=7))
+    xlab(paste(variables_abundance[i],
+               case_when(grepl("TM|TX",variables_abundance[i]) ~ "(°C)",
+                         grepl("UM",variables_abundance[i]) ~ "(%)",
+                         grepl("RR",variables_abundance[i]) ~ "(mm)"))) +
+    theme(legend.position = "bottom",
+          axis.text.y=element_text(size=7),
+          axis.title.y = element_text(size=10),
+          axis.title.x = element_text(size=10)) +
+    scale_color_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7"))
 
-  if(i > 1){
-    pdps_abundance[[i]] <- pdps_abundance[[i]] +  theme(axis.title.y = element_blank())
-  }
 
 }
 
-plot_pdps_abundance <- patchwork::wrap_plots(pdps_abundance, ncol = 4) + plot_annotation(title = "Abundance model : PDP") + plot_layout(guides = "collect") & theme(legend.position='bottom')
+plot_pdps_abundance <- patchwork::wrap_plots(pdps_abundance) + plot_annotation(title = "Abundance model : PDP") + plot_layout(guides = "collect") & theme(legend.position='bottom')
 
 
-(vip_presence + plot_pdps_presence  + plot_layout(widths = c(1, 5))) / (vip_abundance + plot_pdps_abundance  + plot_layout(widths = c(1, 5)))
+#(vip_presence + plot_pdps_presence  + plot_layout(widths = c(1, 5))) / (vip_abundance + plot_pdps_abundance  + plot_layout(widths = c(1, 5)))
+
+vip_presence + plot_pdps_presence  + plot_layout(widths = c(1, 3))
+
+
+# abundance : interaction rain and temperature
+
+th_pd <- pdp::partial(model_abundance_nowcasting, pred.var = c("TM_0_4","RR_1_5"), pred.fun = pred_wrapper_reg, train = df_mod_abundance_nowcasting) ## array that returns predictions of a variable in a model
+th_pd$yhat = exp(th_pd$yhat)
+#p=pdp::plotPartial(th_pd, rug = T, train = df_mod_abundance_nowcasting)
+
+pdp_interaction_abundance <- ggplot() +
+  metR::geom_contour_fill(data = th_pd, aes(x = TM_0_4, y = RR_1_5, z = yhat), breaks = seq(0,42,2)) +
+  geom_point(data = df_mod_abundance_nowcasting, aes(x=TM_0_4, y=RR_1_5, size = exp(NB_ALBO_TOT)), shape = 1, colour = "white") +
+  scale_fill_viridis_b(breaks = seq(0, 42, 2))+#, labels = c("Lowest",rep("",20),"Highest")) +
+  #labs(x = "Average temperature\nover the month preceding collection (°C)", y = "Cumulative rainfall\nover the month preceding collection (mm)", fill = "Predicted\nabundance", size = "Observed\nabundance") +
+  labs(x = "TM_0_4 (°C)", y = "RR_1_5 (mm)", fill = "Predicted\nabundance", size = "Observed\nabundance") +
+  theme_classic() +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_size_continuous(range = c(0.5, 4)) +
+  guides(size = "none") +
+  theme(#legend.position = "bottom",
+        legend.title=element_text(size=10),
+        axis.text.y=element_text(size=7),
+        axis.title.x = element_text(size=10),
+        axis.title.y = element_text(size=10))
 
 
 ######
@@ -376,36 +433,28 @@ for(j in 1:length(sites)){
 }
 pd$yhat[which(pd$yhat<0)] <-0
 pd$yhat <- exp(pd$yhat)
+pd$site <- fct_relevel(pd$site, sites)
 
- ggplot() +
-  geom_line(data=pd, aes_string(x="TX_0_4", y="yhat", group = "site", color = "site")) +
-  geom_rug(data=df_mod_abundance_nowcasting_tmax, aes_string(x = "TX_0_4"), sides="b") +
+pdp_tmax <- ggplot() +
+   geom_smooth(data=pd, aes_string(x="TX_0_4", y="yhat", group = "site", color = "site"), se = F, method = "gam", formula = y ~ s(x, bs = "cs"), linewidth = 0.5) +
+   geom_rug(data=df_mod_abundance_nowcasting_tmax, aes_string(x = "TX_0_4"), sides="b") +
   theme_bw() +
-  ylim(c(0,35)) +
+  ylim(c(0,40)) +
+  xlab("TX_0_4 (°C)") +
   theme(axis.text.y=element_text(size=7),
-        axis.title.y = element_blank())
+        axis.title.y = element_blank(),
+        legend.position = "bottom",
+        axis.title.x = element_text(size=10)) +
+  scale_color_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7"))
 
 
-# abundance : interaction rain and temperature
+# p1 = vip_presence + pdps_presence[[1]] + pdps_presence[[2]] + plot_spacer()  + plot_spacer()  + plot_spacer() + plot_layout(ncol = 6,widths = c(1, 1, 1, 1, 1, 1.8), guides = 'collect', axis_titles = "collect")
+# p2 = vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +  pdps_abundance[[3]] + pdp_tmax + pdp_interaction_abundance + plot_layout(ncol = 6, widths = c(1, 1, 1, 1, 1, 1.8), guides = 'collect', axis_titles = "collect") &  theme(legend.position = 'bottom')
+# p1/p2
 
-th_pd <- pdp::partial(model_abundance_nowcasting, pred.var = c("TM_0_4","RR_0_4"), pred.fun = pred_wrapper_reg, train = df_mod_abundance_nowcasting) ## array that returns predictions of a variable in a model
-th_pd$yhat = exp(th_pd$yhat)
-#p=pdp::plotPartial(th_pd, rug = T, train = df_mod_abundance_nowcasting)
-
-pdp_interaction_abundance <- ggplot() +
-  geom_tile(data = th_pd, aes(x = TM_0_4, y = RR_0_4, fill = yhat)) +
-  geom_point(data = df_mod_abundance_nowcasting, aes(x=TM_0_4, y=RR_0_4, size = exp(NB_ALBO_TOT)), shape = 1) +
-  scale_fill_viridis_b(n.breaks = 18, labels = c("Lowest",rep("",16),"Highest")) +
-  labs(x = "Average temperature\nover the month preceding collection (°C)", y = "Cumulative rainfall\nover the month preceding collection (mm)", fill = "Predicted\nabundance", size = "Observed\nabundance") +
-  theme_classic() +
-  scale_x_continuous(expand = c(0, 0)) +
-  scale_y_continuous(expand = c(0, 0))
-
-
-
-
-
-
+vip_presence + pdps_presence[[1]] + pdps_presence[[2]] + plot_spacer()  + plot_spacer()  + plot_spacer() +
+  vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +  pdps_abundance[[3]] + pdp_tmax + pdp_interaction_abundance +
+  plot_layout(nrow=2,guides = 'collect', axis_titles = "collect") &  theme(legend.position = 'bottom')
 
 ########################s
 ## Local interpretation
@@ -413,13 +462,14 @@ pdp_interaction_abundance <- ggplot() +
 
 library(lime)
 
-df_mod_presence_nowcasting_lime <- df_mod_presence_nowcasting %>% dplyr::select(variables_presence,"site")
-explainer_presence <- lime(df_mod_presence_nowcasting_lime, model_presence_nowcasting, n_bins = 5)
-
-df_mod_abundance_nowcasting_lime <- df_mod_abundance_nowcasting %>% dplyr::select(vis_abundance$Variable,"site")
-explainer_abundance <- lime(df_mod_abundance_nowcasting_lime, model_abundance_nowcasting, n_bins = 5)
 
 fun_get_lime <- function(th_site){
+
+  df_mod_presence_nowcasting_lime <- df_mod_presence_nowcasting %>% dplyr::select(variables_presence,"site")
+  explainer_presence <- lime(df_mod_presence_nowcasting_lime, model_presence_nowcasting, n_bins = 10)
+
+  df_mod_abundance_nowcasting_lime <- df_mod_abundance_nowcasting %>% dplyr::select(variables_abundance,"site")
+  explainer_abundance <- lime(df_mod_abundance_nowcasting_lime, model_abundance_nowcasting, n_bins = 10)
 
 x_presence = df_mod_presence_nowcasting %>%
   filter(site==th_site)
@@ -429,7 +479,7 @@ explanation_presence <- explain(
   explainer = explainer_presence,
   n_permutations = 5000,
   dist_fun = "gower",
-  kernel_width = .75,
+  kernel_width = NULL,
   n_features = 10,
   feature_select = "highest_weights",
   labels = "Presence"
@@ -437,6 +487,7 @@ explanation_presence <- explain(
 
 x_presence <- x_presence %>%
   slice(rep(1:n(), each = length(c(variables_presence,"site")))) %>%
+  #slice(rep(1:n(), each = length(variables_presence))) %>%
   dplyr::select(site, Year, week)
 
 explanation_presence <- explanation_presence %>%
@@ -454,12 +505,13 @@ explanation_abundance <- explain(
   explainer = explainer_abundance,
   n_permutations = 5000,
   dist_fun = "gower",
-  kernel_width = .75,
+  kernel_width = NULL,
   n_features = 10,
   feature_select = "highest_weights")
 
 x_abundance <- x_abundance %>%
   slice(rep(1:n(), each = length(c(variables_abundance,"site")))) %>%
+  #slice(rep(1:n(), each = length(variables_presence))) %>%
   dplyr::select(site, Year, week)
 
 explanation_abundance <- explanation_abundance %>%
@@ -487,8 +539,8 @@ return(explanation_tot)
 }
 
 perols <- fun_get_lime("PEROLS")
-bayonne <- fun_get_lime("BAYONNE")
 murviel <- fun_get_lime("MURVIEL-LES-MONTPELLIER")
+bayonne <- fun_get_lime("BAYONNE")
 medard <- fun_get_lime("SAINT-MEDARD-EN-JALLES")
 
 
@@ -514,10 +566,10 @@ plot_lime <- function(explanation){
     scale_fill_gradientn(
       name = "Feature contribution",
       colours = c("firebrick", "#f7f7f7", "steelblue"),
-      values = scales::rescale(c(-2.5, -0.5, 0, 0.5, 2.5)),  # non-linear steps
+      values = scales::rescale(c(-2.5, -0.75, 0, 0.75, 2.5)),  # non-linear steps
       limits = c(-2.5, 2.5),
       breaks = c(-2, -0.4, 0, 0.4, 2),
-      labels = c("Important - positive", "", "no contribution", "", "Important - negative")
+      labels = c("Important - negative", "", "no contribution", "", "Important - positive")
     ) +
     theme_light() +
     #facet_grid(rows = vars(feature_char), space="free", scales = "free_y") +
@@ -530,7 +582,8 @@ plot_lime <- function(explanation){
          axis.ticks.x=element_blank(),
          legend.text=element_text(size=9),
          text = element_text(size=10)
-   )
+   ) +
+    xlim(c(as.Date("2023-01-09"),as.Date("2024-12-23")))
 
 
   return(p1)
@@ -549,22 +602,22 @@ scaleFactor = 0.6
 dd_perols <- p_perols +
   geom_point(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
-  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#80634C", "Predictions (ML)" = "#1AAFBC"))
+  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_murviels <- p_murviels +
   geom_point(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
-  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#80634C", "Predictions (ML)" = "#1AAFBC"))
+  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_bayonne <- p_bayonne +
   geom_point(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
-  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#80634C", "Predictions (ML)" = "#1AAFBC"))
+  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_medard <- p_medard +
   geom_point(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
-  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#80634C", "Predictions (ML)" = "#1AAFBC"))
+  scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 
 (
@@ -574,6 +627,12 @@ dd_medard <- p_medard +
     (plot_lime(bayonne) + plot_lime(medard))
 ) +
   plot_layout(guides = "collect", heights = c(2, 1, 2, 1))
+
+
+dd_perols/plot_lime(perols)+ plot_layout(heights = c(1, 2))
+dd_murviels/plot_lime(murviel)+ plot_layout(heights = c(1, 2))
+dd_bayonne/plot_lime(bayonne)+ plot_layout(heights = c(1, 2))
+dd_medard/plot_lime(medard)+ plot_layout(heights = c(1, 2))
 
 
 ###########################

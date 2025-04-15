@@ -57,7 +57,7 @@ df_cor <- subset(as.data.frame(index) , row <= col)
 p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_cor[,2]])
 
 ## Final variables selections
-predictors_presence <- c("TM_0_8","UM_0_8","RR_0_8","FFM_0_8")
+predictors_presence <- c("TM_0_8","UM_5_11")
 
 #### Final data frame for the multivariate analysis
 df_model_presence <- df_model %>%
@@ -102,7 +102,7 @@ p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_
 
 
 ## Final variables selections
-predictors_abundance <- c("TM_0_4","UM_0_4","RR_0_4","FFM_0_4")
+predictors_abundance <- c("TM_0_4","UM_0_11","RR_1_5")
 
 
 #### Final data frame for the multivariate analysis
@@ -160,7 +160,7 @@ saveRDS(res_multiv_model_presence_nowcasting,"res_multiv_model_presence_nowcasti
 
 df_model_abundance$NB_ALBO_TOT <- log(df_model_abundance$NB_ALBO_TOT)
 
-cv_col <- "Year"
+cv_col <- "site"
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance, spacevar = cv_col,k = length(unique(unlist(df_model_abundance[,cv_col]))))

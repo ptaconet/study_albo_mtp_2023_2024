@@ -159,12 +159,12 @@ df <- df_meteofrance_2023_2024 %>%
   left_join(pieges_data, by = c("year","week","site")) %>%
   filter(year %in% c(2023, 2024)) %>%
   mutate(date = as.Date(paste(year, week, 1, sep="-"), "%Y-%U-%u")) %>%
-  mutate(site = fct_relevel(site, c("PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" )))
+  mutate(site = fct_relevel(site, c("PEROLS", "MURVIEL-LES-MONTPELLIER", "BAYONNE","SAINT-MEDARD-EN-JALLES" ,  "RENNES" )))
 
 df <- df %>% filter(site %in% c("PEROLS","MURVIEL-LES-MONTPELLIER","SAINT-MEDARD-EN-JALLES","BAYONNE"))
 
 df_meteofrance_historique <- df_meteofrance_historique %>%
-  mutate(site = fct_relevel(site, c("PEROLS", "MURVIEL-LES-MONTPELLIER", "SAINT-MEDARD-EN-JALLES" , "BAYONNE", "RENNES" ))) %>%
+  mutate(site = fct_relevel(site, c("PEROLS", "MURVIEL-LES-MONTPELLIER","BAYONNE",  "SAINT-MEDARD-EN-JALLES" , "RENNES" ))) %>%
   filter(site %in% c("PEROLS","MURVIEL-LES-MONTPELLIER","SAINT-MEDARD-EN-JALLES","BAYONNE"))
 
 
@@ -240,7 +240,7 @@ p_medard <- fun_plot_by_site("SAINT-MEDARD-EN-JALLES")
 
 
 df <- df %>%
-  mutate(TMN = ifelse(week %% 2 ==0, TMN, NA))%>%
+  mutate(TMN = ifelse(week %% 2 ==0, TMN, NA)) %>%
   mutate(RDF = ifelse(week %% 2 ==0, RFD, NA))
 
 #df <- df %>% mutate(RFD = ifelse(year==2024, -RFD, RFD))
@@ -250,16 +250,16 @@ scaleFactor = 0.6
 # Clean color palette for years
 year_colors <- c("2023" = "#1f77b4", "2024" = "#ff7f0e")  # Adjust as needed
 
-ggplot(df, aes(x = week)) +
+ ggplot(df, aes(x = week)) +
   # Rainfall bars
   geom_col(aes(y = RFD, fill = as.factor(year)),position = "dodge", alpha = 0.4, width = 0.6) +
   # Temperature line (dashed)
   ggalt::geom_xspline(aes(y = TMN, colour = as.factor(year)),size = 0.8, alpha = 0.7) +
   # Mosquito abundance: line + points (scaled)
   geom_point(aes(y = effectif_jour * scaleFactor, colour = as.factor(year)), shape = 16, size = 1.8, alpha = 0.7) +
-  ggalt::geom_xspline(data = df[!is.na(df$effectif_jour), ],
+  geom_line(data = df[!is.na(df$effectif_jour), ],
             aes(y = effectif_jour * scaleFactor, colour = as.factor(year)),
-            size = 1) +
+            size = 0.7) +
   # Historical temperature line
   #geom_xspline(data = df_meteofrance_historique, aes(x = week, y = TMN), color = "black", alpha = 0.4, size = 0.6, linetype = "longdash") +
   # Y-axis settings
@@ -275,7 +275,6 @@ ggplot(df, aes(x = week)) +
   labs(x = "Week") +
   theme_light(base_size = 11) +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position = "bottom",
     legend.title = element_blank(),
     panel.grid.minor = element_blank()
