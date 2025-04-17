@@ -224,9 +224,17 @@ p_th_site <- ggplot(df2, aes(x = date)) +
   theme(legend.position = "right",
         legend.title = element_blank(),
         axis.title.x = element_blank(),
+        legend.text=element_text(size=9),
         text = element_text(size=10),
-        plot.title = element_text(size=10)
-        )
+        plot.title = element_text(size=10),
+        plot.margin = margin(5, 5, 5, 5)
+        ) +
+  scale_x_date(limits =c(as.Date("2023-01-01"),as.Date("2024-12-31")),
+                               breaks = seq(as.Date("2023-01-01"), as.Date("2025-01-01"), by = "3 month"),
+               minor_breaks = seq(as.Date("2023-01-01"), as.Date("2025-01-01"), by = "1 month"),
+               date_labels = "%Y-%m")
+
+
 
 return(p_th_site)
 

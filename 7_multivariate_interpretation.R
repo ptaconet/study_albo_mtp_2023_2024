@@ -172,9 +172,12 @@ df %>%
   group_by(site) %>%
   summarise(spearman_metelmann = round(cor(obs, pred_metelmann, method="spearman", use = "complete.obs"),2),
             spearman_arbocarto = round(cor(obs, pred_arbocarto, method="spearman", use = "complete.obs"),2),
-            #spearman_ML_explanatory = round(cor(obs, pred_stat_explanatory, method="spearman", use = "complete.obs"),2),
             spearman_ML_nowcasting = round(cor(obs, pred_stat_nowcasting, method="spearman", use = "complete.obs"),2),
             spearman_ML_forecasting = round(cor(obs, pred_stat_forecasting, method="spearman", use = "complete.obs"),2),
+            pearson_metelmann = round(cor(obs, pred_metelmann, method="pearson", use = "complete.obs"),2),
+            pearson_arbocarto = round(cor(obs, pred_arbocarto, method="pearson", use = "complete.obs"),2),
+            pearson_ML_nowcasting = round(cor(obs, pred_stat_nowcasting, method="pearson", use = "complete.obs"),2),
+            pearson_ML_forecasting = round(cor(obs, pred_stat_forecasting, method="pearson", use = "complete.obs"),2)
             )
 
 
@@ -248,8 +251,9 @@ vip_presence <- ggplot(vis_presence, aes(x = Variable, y = Importance, fill = si
   ggtitle("Presence model") +
   ylab("Variable importance") +
   theme( axis.title.x=element_blank(),
-        axis.text.y=element_text(size=7),
-        axis.title.y = element_text(size=10)) +
+        axis.text.y=element_text(size=7)#,
+        #axis.title.y = element_text(size=10)
+        ) +
   scale_x_discrete(guide = guide_axis(angle = 0)) +
   scale_fill_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7")) +
   guides(fill="none")
@@ -261,8 +265,9 @@ vip_abundance <- ggplot(vis_abundance, aes(x = Variable, y = Importance, fill = 
   ggtitle("Abundance model") +
   ylab("Variable importance") +
   theme(axis.title.x=element_blank(),
-        axis.text.y=element_text(size=7),
-        axis.title.y = element_text(size=10)) +
+        axis.text.y=element_text(size=7)#,
+        #axis.title.y = element_text(size=10)
+        ) +
   scale_x_discrete(guide = guide_axis(angle = 0)) +
   scale_fill_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7")) +
   guides(fill="none")
@@ -315,8 +320,9 @@ for(i in 1:length(variables_presence)){
                          grepl("RR",variables_presence[i]) ~ "(mm)"))) +
     theme(legend.position = "none",
           axis.text.y=element_text(size=7),
-          axis.title.y = element_text(size=10),
-          axis.title.x = element_text(size=10)) +
+          axis.title.y = element_text(size=10)#,
+          #axis.title.x = element_text(size=10)
+          ) +
     scale_color_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7"))
 
 
@@ -376,8 +382,9 @@ for(i in 1:length(variables_abundance)){
                          grepl("RR",variables_abundance[i]) ~ "(mm)"))) +
     theme(legend.position = "bottom",
           axis.text.y=element_text(size=7),
-          axis.title.y = element_text(size=10),
-          axis.title.x = element_text(size=10)) +
+          axis.title.y = element_text(size=10)#,
+          #axis.title.x = element_text(size=10)
+          ) +
     scale_color_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7"))
 
 
@@ -400,7 +407,7 @@ th_pd$yhat = exp(th_pd$yhat)
 pdp_interaction_abundance <- ggplot() +
   metR::geom_contour_fill(data = th_pd, aes(x = TM_0_4, y = RR_1_5, z = yhat), breaks = seq(0,42,2)) +
   geom_point(data = df_mod_abundance_nowcasting, aes(x=TM_0_4, y=RR_1_5, size = exp(NB_ALBO_TOT)), shape = 1, colour = "white") +
-  scale_fill_viridis_b(breaks = seq(0, 42, 2))+#, labels = c("Lowest",rep("",20),"Highest")) +
+  scale_fill_viridis_b(breaks = seq(0, 42, 2), labels = NULL)+#, labels = c("Lowest",rep("",20),"Highest")) +
   #labs(x = "Average temperature\nover the month preceding collection (°C)", y = "Cumulative rainfall\nover the month preceding collection (mm)", fill = "Predicted\nabundance", size = "Observed\nabundance") +
   labs(x = "TM_0_4 (°C)", y = "RR_1_5 (mm)", fill = "Predicted\nabundance", size = "Observed\nabundance") +
   theme_classic() +
@@ -448,13 +455,26 @@ pdp_tmax <- ggplot() +
   scale_color_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7"))
 
 
-# p1 = vip_presence + pdps_presence[[1]] + pdps_presence[[2]] + plot_spacer()  + plot_spacer()  + plot_spacer() + plot_layout(ncol = 6,widths = c(1, 1, 1, 1, 1, 1.8), guides = 'collect', axis_titles = "collect")
-# p2 = vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +  pdps_abundance[[3]] + pdp_tmax + pdp_interaction_abundance + plot_layout(ncol = 6, widths = c(1, 1, 1, 1, 1, 1.8), guides = 'collect', axis_titles = "collect") &  theme(legend.position = 'bottom')
-# p1/p2
 
-vip_presence + pdps_presence[[1]] + pdps_presence[[2]] + plot_spacer()  + plot_spacer()  + plot_spacer() +
-  vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +  pdps_abundance[[3]] + pdp_tmax + pdp_interaction_abundance +
-  plot_layout(nrow=2,guides = 'collect', axis_titles = "collect") &  theme(legend.position = 'bottom')
+# vip_presence + pdps_presence[[1]] + pdps_presence[[2]] + plot_spacer()  + plot_spacer()  + plot_spacer() +
+#   vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +  pdps_abundance[[3]] + pdp_tmax + pdp_interaction_abundance +
+#   plot_layout(nrow=2,guides = 'collect', axis_titles = "collect") &  theme(legend.position = 'bottom')
+
+# Row 1
+row1 <- vip_presence + pdps_presence[[1]] + pdps_presence[[2]] +
+  plot_spacer() + plot_spacer() + plot_spacer() +
+  plot_layout(ncol = 6, widths = c(1, 1, 1, 1.4, 1.4, 1.3), axis_titles = "collect")
+
+# Row 2: make last plot wider
+row2 <- vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +
+  pdps_abundance[[3]] + pdp_tmax + pdp_interaction_abundance +
+  plot_layout(ncol = 6, widths = c(1, 1, 1, 1, 1, 1.6),guides = 'collect', axis_titles = "collect")  # <– wider last plot!
+
+# Combine rows
+row1 / row2 +
+  plot_layout(nrow = 2, guides = 'collect', axis_titles = "collect") &
+  theme(legend.position = 'bottom')
+
 
 ########################s
 ## Local interpretation
@@ -544,7 +564,7 @@ bayonne <- fun_get_lime("BAYONNE")
 medard <- fun_get_lime("SAINT-MEDARD-EN-JALLES")
 
 
-plot_lime <- function(explanation){
+plot_lime_v1 <- function(explanation){
 
   explanation <- explanation %>%
     mutate(feature_char = case_when(grepl("UM", feature) ~ "Humidity",
@@ -552,6 +572,58 @@ plot_lime <- function(explanation){
                                grepl("site", feature) ~ "site",
                                grepl("RR", feature) ~ "Rainfall",
                                grepl("FFM", feature) ~ "Wind")) %>%
+    #mutate(feature_char = fct_relevel(feature_char, rev(c("Temperature","Rainfall","Humidity","Wind","site")))) %>%
+    mutate(feature_char = fct_relevel(feature_char, c("Temperature","Rainfall","Humidity","Wind","site"))) %>%
+    filter(feature_char!="site") %>%
+    mutate(feature_weight = ifelse(feature_weight < -2.5, -2.5 ,feature_weight))
+
+  explanation$feature_desc <- factor(explanation$feature_desc,levels = unique(explanation$feature_desc[order(as.numeric(explanation$feature_value))]))
+
+
+  p1 <- ggplot(explanation, aes_(~date, ~feature_desc)) +
+    geom_tile(aes_(fill = ~feature_weight)) +
+    scale_y_discrete("Feature",expand = c(0, 0)) +
+    #scale_fill_gradient2("Feature weight",low = "firebrick", mid = "#f7f7f7", high = "steelblue",  limit = c(-2,2.5), n.breaks = 5, labels = c("Important - reduce","","no weight","","Important - raises")) +
+    scale_fill_gradientn(
+      name = "Feature contribution",
+      colours = c("firebrick", "#f7f7f7", "steelblue"),
+      values = scales::rescale(c(-2.5, -0.75, 0, 0.75, 2.5)),  # non-linear steps
+      limits = c(-2.5, 2.5),
+      breaks = c(-2, -0.4, 0, 0.4, 2),
+      labels = c("Important - negative", "", "no contribution", "", "Important - positive")
+    ) +
+    theme_light() +
+    facet_grid(rows = vars(feature_char), space="free", scales = "free_y") +
+   theme(panel.border = element_rect(fill = NA,colour = "grey60", size = 0.5),
+         #panel.grid = element_blank(),
+         legend.position = "right",
+         axis.title.y = element_blank(),
+         axis.title.x = element_blank(),
+         axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         legend.text=element_text(size=9),
+         text = element_text(size=10),
+         plot.margin = margin(5, 5, 5, 5),
+         strip.text = element_text(size = rel(1.2))
+   ) +
+    scale_x_date(limits = c(as.Date("2023-01-01"),as.Date("2024-12-31")),
+                       breaks = seq(as.Date("2023-01-01"), as.Date("2025-01-01"), by = "3 month"),
+                       minor_breaks = seq(as.Date("2023-01-01"), as.Date("2025-01-01"), by = "1 month"),
+                       date_labels = "%Y-%m")
+
+
+  return(p1)
+}
+
+
+plot_lime_v2 <- function(explanation){
+
+  explanation <- explanation %>%
+    mutate(feature_char = case_when(grepl("UM", feature) ~ "Humidity",
+                                    grepl("TM", feature) ~ "Temperature",
+                                    grepl("site", feature) ~ "site",
+                                    grepl("RR", feature) ~ "Rainfall",
+                                    grepl("FFM", feature) ~ "Wind")) %>%
     mutate(feature_char = fct_relevel(feature_char, rev(c("Temperature","Rainfall","Humidity","Wind","site")))) %>%
     filter(feature_char!="site") %>%
     mutate(feature_weight = ifelse(feature_weight < -2.5, -2.5 ,feature_weight))
@@ -572,23 +644,26 @@ plot_lime <- function(explanation){
       labels = c("Important - negative", "", "no contribution", "", "Important - positive")
     ) +
     theme_light() +
-    #facet_grid(rows = vars(feature_char), space="free", scales = "free_y") +
-   theme(panel.border = element_rect(fill = NA,colour = "grey60", size = 1),
-         panel.grid = element_blank(),
-         legend.position = "right",
-         axis.title.y = element_blank(),
-         axis.title.x = element_blank(),
-         axis.text.x=element_blank(),
-         axis.ticks.x=element_blank(),
-         legend.text=element_text(size=9),
-         text = element_text(size=10)
-   ) +
-    xlim(c(as.Date("2023-01-09"),as.Date("2024-12-23")))
+    theme(panel.border = element_rect(fill = NA,colour = "grey60", size = 0.5),
+          #panel.grid = element_blank(),
+          legend.position = "right",
+          axis.title.y = element_blank(),
+          axis.title.x = element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          legend.text=element_text(size=9),
+          text = element_text(size=10),
+          plot.margin = margin(5, 5, 5, 5),
+          strip.text = element_text(size = rel(1.2))
+    ) +
+    scale_x_date(limits = c(as.Date("2023-01-01"),as.Date("2024-12-31")),
+                 breaks = seq(as.Date("2023-01-01"), as.Date("2025-01-01"), by = "3 month"),
+                 minor_breaks = seq(as.Date("2023-01-01"), as.Date("2025-01-01"), by = "1 month"),
+                 date_labels = "%Y-%m")
 
 
   return(p1)
 }
-
 
 
 df_cv_paul <- df_cv_paul %>%
@@ -622,17 +697,29 @@ dd_medard <- p_medard +
 
 (
   (dd_perols + dd_murviels) /
-    (plot_lime(perols) + plot_lime(murviel)) /
+    (plot_lime_v2(perols) + plot_lime_v2(murviel)) /
   (dd_bayonne + dd_medard) /
-    (plot_lime(bayonne) + plot_lime(medard))
+    (plot_lime_v2(bayonne) + plot_lime_v2(medard))
 ) +
-  plot_layout(guides = "collect", heights = c(2, 1, 2, 1))
+  plot_layout(guides = "collect", heights = c(2, 1, 2, 1), axis_titles = "collect")
 
 
-dd_perols/plot_lime(perols)+ plot_layout(heights = c(1, 2))
-dd_murviels/plot_lime(murviel)+ plot_layout(heights = c(1, 2))
-dd_bayonne/plot_lime(bayonne)+ plot_layout(heights = c(1, 2))
-dd_medard/plot_lime(medard)+ plot_layout(heights = c(1, 2))
+
+dd_perols/plot_lime_v1(perols)+ plot_layout(heights = c(1, 2))
+dd_murviels/plot_lime_v1(murviel)+ plot_layout(heights = c(1, 2))
+dd_bayonne/plot_lime_v1(bayonne)+ plot_layout(heights = c(1, 2))
+dd_medard/plot_lime_v1(medard)+ plot_layout(heights = c(1, 2))
+
+
+
+
+
+
+
+
+
+
+
 
 
 ###########################
