@@ -112,7 +112,7 @@ df %>%
   mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER",  "BAYONNE","SAINT-MEDARD-EN-JALLES" , "RENNES" ))) %>%
   ggplot(aes(x = date, y = value, color = name, group = name, size = ifelse(name %in% c("obs_mathematical","obs_statistical"), 0.6, 0.5))) +
   geom_line() +
-  geom_point(size = 0.5) +
+  #geom_point(size = 0.5) +
   #ggh4x::facet_grid2(cols = vars(model), rows = vars(site), scales = "free_y", independent = "y") +
   facet_grid(cols = vars(site), rows = vars(model), scales = "free_y") +
  scale_color_manual(values = c(
@@ -405,9 +405,9 @@ th_pd$yhat = exp(th_pd$yhat)
 #p=pdp::plotPartial(th_pd, rug = T, train = df_mod_abundance_nowcasting)
 
 pdp_interaction_abundance <- ggplot() +
-  metR::geom_contour_fill(data = th_pd, aes(x = TM_0_4, y = RR_1_5, z = yhat), breaks = seq(0,42,2)) +
+  metR::geom_contour_fill(data = th_pd, aes(x = TM_0_4, y = RR_1_5, z = yhat), breaks = seq(0,46,2)) +
   geom_point(data = df_mod_abundance_nowcasting, aes(x=TM_0_4, y=RR_1_5, size = exp(NB_ALBO_TOT)), shape = 1, colour = "white") +
-  scale_fill_viridis_b(breaks = seq(0, 42, 2), labels = NULL)+#, labels = c("Lowest",rep("",20),"Highest")) +
+  scale_fill_viridis_b(breaks = seq(0, 46, 2), labels = NULL)+#, labels = c("Lowest",rep("",20),"Highest")) +
   #labs(x = "Average temperature\nover the month preceding collection (°C)", y = "Cumulative rainfall\nover the month preceding collection (mm)", fill = "Predicted\nabundance", size = "Observed\nabundance") +
   labs(x = "TM_0_4 (°C)", y = "RR_1_5 (mm)", fill = "Predicted\nabundance", size = "Observed\nabundance") +
   theme_classic() +
@@ -456,9 +456,11 @@ pdp_tmax <- ggplot() +
 
 
 
-# vip_presence + pdps_presence[[1]] + pdps_presence[[2]] + plot_spacer()  + plot_spacer()  + plot_spacer() +
-#   vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +  pdps_abundance[[3]] + pdp_tmax + pdp_interaction_abundance +
-#   plot_layout(nrow=2,guides = 'collect', axis_titles = "collect") &  theme(legend.position = 'bottom')
+row1 <- vip_presence + pdps_presence[[1]] + pdps_presence[[2]] +   plot_spacer() + plot_layout(ncol = 4, widths = c(1, 1, 1, 1.4), axis_titles = "collect")
+row2 <- vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] + pdps_abundance[[3]] +  plot_layout(ncol = 4, axis_titles = "collect")
+
+(vip_presence + pdps_presence[[1]] + pdps_presence[[2]] +   plot_spacer()) +  vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] + pdps_abundance[[3]] + plot_layout(nrow=2,guides = 'collect', axis_titles = "collect") &  theme(legend.position = 'bottom')
+
 
 # Row 1
 row1 <- vip_presence + pdps_presence[[1]] + pdps_presence[[2]] +
@@ -482,17 +484,27 @@ row1 / row2 +
 
 library(lime)
 
+meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
+  mutate(date=as.Date(date)) %>%
+  mutate(week = week(date), Year = year(date)) %>%
+  dplyr::filter(date>as.Date("2023-01-01"))
+
+
 
 fun_get_lime <- function(th_site){
 
   df_mod_presence_nowcasting_lime <- df_mod_presence_nowcasting %>% dplyr::select(variables_presence,"site")
-  explainer_presence <- lime(df_mod_presence_nowcasting_lime, model_presence_nowcasting, n_bins = 10)
+  explainer_presence <- lime(df_mod_presence_nowcasting_lime, model_presence_nowcasting, n_bins = 15)
 
   df_mod_abundance_nowcasting_lime <- df_mod_abundance_nowcasting %>% dplyr::select(variables_abundance,"site")
-  explainer_abundance <- lime(df_mod_abundance_nowcasting_lime, model_abundance_nowcasting, n_bins = 10)
+  explainer_abundance <- lime(df_mod_abundance_nowcasting_lime, model_abundance_nowcasting, n_bins = 15)
 
-x_presence = df_mod_presence_nowcasting %>%
-  filter(site==th_site)
+# x_presence = df_mod_presence_nowcasting %>%
+#   filter(site==th_site)
+
+  x_presence = meteo %>%
+     filter(site==th_site) %>%
+    filter(!is.na(UM_5_11))
 
 explanation_presence <- explain(
   x = x_presence  %>% dplyr::select(variables_presence,"site"),
@@ -517,7 +529,10 @@ explanation_presence <- explanation_presence %>%
 
 # abundance
 
-x_abundance = df_mod_abundance_nowcasting %>%
+# x_abundance = df_mod_abundance_nowcasting %>%
+#   filter(site==th_site)
+
+x_abundance = meteo %>%
   filter(site==th_site)
 
 explanation_abundance <- explain(
@@ -542,14 +557,21 @@ explanation_abundance <- explanation_abundance %>%
 
 ## mix presence and abundance
 
-a = unique(x_abundance[c("Year", "week")])
+# a = unique(x_abundance[c("Year", "week")])
+# a$is_pres <- TRUE
+# explanation_presence <- explanation_presence %>%
+#   left_join(a) %>%
+#   filter(is.na(is_pres))
+
+explanation_presence <- explanation_presence %>% filter(explanation_presence$label_prob<0.5)
+a = unique(explanation_presence[c("Year", "week")])
 a$is_pres <- TRUE
-explanation_presence <- explanation_presence %>%
-  left_join(a) %>%
-  filter(is.na(is_pres))
 
+explanation_abundance <- explanation_abundance %>%
+   left_join(a) %>%
+   filter(is.na(is_pres))
 
-explanation_tot <- rbind(explanation_presence[,c("site","Year","week","model","feature","feature_value","feature_weight","feature_desc")],
+ explanation_tot <- rbind(explanation_presence[,c("site","Year","week","model","feature","feature_value","feature_weight","feature_desc")],
                          explanation_abundance[,c("site","Year","week","model","feature","feature_value","feature_weight","feature_desc")])
 
 explanation_tot$date <- as.Date(paste(explanation_tot$Year, explanation_tot$week, 1, sep = "-"), "%Y-%U-%u")
@@ -671,26 +693,31 @@ df_cv_paul <- df_cv_paul %>%
   add_row(site = "BAYONNE", Year = 2024, week = 1, pred_stat_nowcasting = 1000, pred_stat_forecasting = NA) %>%
   add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, pred_stat_nowcasting = 1000, pred_stat_forecasting = NA)
 
+# df_cv_paul <- read.csv("pred_llo.csv") %>%
+#   mutate(date = as.Date(date)) %>%
+#   dplyr::filter(date>as.Date("2023-01-01")) %>%
+#   rename(pred_stat_nowcasting = pred_abundance)
+
 
 scaleFactor = 0.6
 
 dd_perols <- p_perols +
-  geom_point(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  #geom_point(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
   scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_murviels <- p_murviels +
-  geom_point(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  #geom_point(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
   scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_bayonne <- p_bayonne +
-  geom_point(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  #geom_point(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
   scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_medard <- p_medard +
-  geom_point(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  #geom_point(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
   scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 

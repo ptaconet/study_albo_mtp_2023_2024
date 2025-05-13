@@ -24,7 +24,8 @@ df_meteofrance_2023_2024 <- read.csv(file.path("data","processed","data_meteofra
   mutate( week = week(date), month = month(date), year = year(date)) %>%
   group_by(nom_commune, week, year) %>%
   summarise(RFD = sum(RR, na.rm = T), TMN = mean(TM, na.rm = T), TN = mean(TMN, na.rm = T), TX = mean(TX, na.rm = T), UM = mean(UM, na.rm = T)) %>%
-  group_by(nom_commune, week) %>%
+  arrange(nom_commune, year, week) %>%
+  group_by(nom_commune, year) %>%
   mutate(RFDcum = cumsum(RFD)) %>%
   mutate(year = as.character(year)) %>%
   ungroup() %>%
@@ -294,23 +295,128 @@ year_colors <- c("2023" = "#1f77b4", "2024" = "#ff7f0e")  # Adjust as needed
 
 
 
+
+
+
+
+
+
+
+
+
+ library(ggimage)
+
+ icons <- data.frame(
+   week = c(9, 22.5, 31, 40,49),
+   y = c(55, 55, 55, 55,55),
+   image =  c("no_mosquito.jpg", "spring.jpg",  "summer.jpg", "autumn.jpg", "no_mosquito.jpg")
+ )
+
+ df_monthly <- df %>%
+   mutate(
+     year = year(date),
+     month = month(date),
+     site = as.factor(site)
+   ) %>%
+   group_by(site, year, month) %>%
+   summarise(
+     TMN_monthly = mean(TMN, na.rm = TRUE),
+     RFD_monthly = mean(RFD, na.rm = TRUE),
+     .groups = "drop"
+   )
+
+ df_monthly <- df_monthly %>%
+   mutate(week = case_when(
+     month == 1 ~ 2,
+     month == 2 ~ 6,
+     month == 3 ~ 10,
+     month == 4 ~ 14,
+     month == 5 ~ 18,
+     month == 6 ~ 24,
+     month == 7 ~ 28,
+     month == 8 ~ 32,
+     month == 9 ~ 36,
+     month == 10 ~ 40,
+     month == 11 ~ 45,
+     month == 12 ~ 50
+   ))
+
+
+ df$month <- cut(df$week,
+                 breaks = c(0, 4, 8, 12, 17, 21, 26, 30, 35, 39, 44, 48, 53),
+                 labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
+                 right = FALSE)
+
+
+ # Clean color palette for years
+ year_colors <- c("2023" = "#1f77b4", "2024" = "#ff7f0e")  # Adjust as needed
+
  scaleFactor = 0.6
- ggplot(df, aes(x = week, group = as.factor(year))) +
-   geom_line(aes(y = RFD, fill = as.factor(year)), position = "dodge", alpha = 0.4, width = 0.5) +  # Rainfall as bars
-   geom_line(aes(y = TMN, colour = as.factor(year)), size = 0.6, alpha = 0.8) +  # Temperature as line
-   geom_point(aes(y = effectif_jour * scaleFactor, colour = as.factor(year))) +
-   geom_line(data=df[!is.na(df$effectif_jour),], aes(y = effectif_jour * scaleFactor,  colour = as.factor(year)), size = 0.6) +  # Scaled mosquito abundance
-   geom_line(data = df_meteofrance_historique, aes(x = week,y = TMN), color = "black", alpha = 0.6,  size = 0.6) +
+
+ ggplot(df, aes(x = week)) +
+
+   geom_vline(xintercept = 18, linetype = "dashed", size = 0.2) +
+   geom_vline(xintercept = 27, linetype = "dashed", size = 0.2) +
+   geom_vline(xintercept = 35, linetype = "dashed", size = 0.2) +
+   geom_vline(xintercept = 44, linetype = "dashed", size = 0.2) +
+
+#
+#    annotate("text", x = 9, y = 55, label = "No activity", size = 3, alpha = 0.6) +
+#    annotate("text", x = 22.5, y = 55, label = "Spring", size = 3, alpha = 0.6) +
+#    annotate("text", x = 31, y = 55, label = "Summer", size = 3, alpha = 0.6) +
+#    annotate("text", x = 40, y = 55, label = "Autumn", size = 3, alpha = 0.6) +
+#    annotate("text", x = 49, y = 55, label = "No activity", size = 3, alpha = 0.6) +
+
+   geom_image(data = icons, aes(x = week, y = y, image = image), size = 0.1) +
+#
+    # geom_rect(aes(xmin=0, xmax=18, ymin=-Inf, ymax=Inf), fill = "#8DA0CB", alpha=0.05, inherit.aes = FALSE) +
+    # geom_rect(aes(xmin=18, xmax=27, ymin=-Inf, ymax=Inf), fill = "#66C2A5", alpha=0.05, inherit.aes = FALSE) +
+    # geom_rect(aes(xmin=27, xmax=35, ymin=-Inf, ymax=Inf), fill = "#FC8D62", alpha=0.05, inherit.aes = FALSE) +
+    # geom_rect(aes(xmin=35, xmax=44, ymin=-Inf, ymax=Inf), fill = "#E78AC3", alpha=0.05, inherit.aes = FALSE) +
+    # geom_rect(aes(xmin=44, xmax=52, ymin=-Inf, ymax=Inf), fill = "#8DA0CB", alpha=0.05, inherit.aes = FALSE) +
+   # Rainfall bars
+   geom_col(data = df_monthly, aes(x = week, y = RFD_monthly, fill = as.factor(year)),position = "dodge", alpha = 0.4, width = 2) +
+   # Temperature line (dashed)
+   geom_line(data = df_monthly,
+                       aes(x = week, y = TMN_monthly, group = year, color = as.factor(year)),
+                       linetype = "dashed", size = 0.5, inherit.aes = FALSE) +
+   geom_point(data = df_monthly,
+             aes(x = week, y = TMN_monthly, group = year, color = as.factor(year)),
+              size = 1, shape = 2, inherit.aes = FALSE) +
+
+   # Mosquito abundance: line + points (scaled)
+   geom_point(aes(y = effectif_jour * scaleFactor, colour = as.factor(year)), shape = 16, size = 1.8, alpha = 0.7) +
+   geom_line(data = df[!is.na(df$effectif_jour), ],
+             aes(y = effectif_jour * scaleFactor, colour = as.factor(year)),
+             size = 0.7) +
+   # Historical temperature line
+   #geom_xspline(data = df_meteofrance_historique, aes(x = week, y = TMN), color = "black", alpha = 0.4, size = 0.6, linetype = "longdash") +
+   # Y-axis settings
    scale_y_continuous(
-     name = "Temperature (°C)",
-     limits = c(0,60),
-     sec.axis = sec_axis(~ . / scaleFactor, name = "Mosquito Abundance (scaled)")  # Secondary axis for mosquito counts
+     name = "Temperature (°C) / Rainfall (mm)",
+     limits = c(0, 60),
+     sec.axis = sec_axis(~ . / scaleFactor, name = "Eggs per trap")
    ) +
-   labs(x = "Date", color = "Legend") +
-   theme_light() +
-   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-         legend.position = "bottom") +
-   facet_wrap(.~site, ncol = 2, nrow = 2)
+   scale_x_continuous(
+     breaks = c(2, 6, 10, 15, 19, 24, 28, 33, 37, 42, 46, 51),
+     labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+   ) +
+   # Manual color/fill for clarity
+   scale_color_manual(name = "Year", values = year_colors) +
+   scale_fill_manual(name = "Year", values = year_colors) +
+   # Theme and axis tweaks
+   labs(x = "Week") +
+   theme_light(base_size = 11) +
+   theme(
+     legend.position = "bottom",
+     legend.title = element_blank(),
+     panel.grid.minor = element_blank()
+   ) +
+   # Facet by site
+   facet_wrap(~ site, ncol = 2)
+
 
 
 

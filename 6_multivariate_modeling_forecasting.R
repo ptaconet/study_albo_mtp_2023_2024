@@ -23,7 +23,8 @@ df_model <- df_model %>%
   mutate(PRES_ALBO = ifelse(NB_ALBO_TOT>0,"Presence","Absence")) %>% ## to create a "character" variable for presence or absence of Aedes albopictus
   mutate(PRES_ALBO = fct_relevel(PRES_ALBO,c("Presence","Absence"))) %>%
   mutate(PRES_ALBO_NUMERIC = ifelse(PRES_ALBO=="Presence",1,0)) %>% ## to create a numeric variable for presence or absence of Aedes albopictus
-  filter(!is.na(NB_ALBO_TOT))
+  filter(!is.na(NB_ALBO_TOT)) %>%
+  dplyr::filter(site!="RENNES")
 
 ###########################
 #########'Presence model preparation
