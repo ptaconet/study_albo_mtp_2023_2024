@@ -199,20 +199,48 @@ ggplot(df, aes(x = date)) +
   geom_label(data= dates_init, aes(label=week, xintercept = date, y = 4))
 
 
+
+
+
+
+
 # plot by site
+
+pred_llo <- read.csv("pred_llo.csv") %>%
+  mutate(date=as.Date(date)) %>%
+  filter(date>="2023-01-01") %>%
+  dplyr::select(site,Year, week,pred,TM_0_8,TM_0_4,RR_1_5) %>%
+  rename(year = Year) %>%
+  mutate(site=as.factor(site))
+
+df1 <- df %>%
+  left_join(pred_llo) %>%
+  mutate(TMN_lagged = ifelse(pred=="Absence", TM_0_8, TM_0_4)) %>%
+  mutate(RFD_lagged = RR_1_5)
+
+
+library(ggimage)
+
+icons <- data.frame(
+  date = c(as.Date(paste(2023,  c(9, 22, 31, 40), 1, sep = "-"), "%Y-%U-%u"),as.Date(paste(2024,  c(5, 22,31, 40,49), 1, sep = "-"), "%Y-%U-%u")),
+  y = rep(55,9),
+  image =  c("no_mosquito.jpg", "spring.jpg",  "summer.jpg", "autumn.jpg","no_mosquito.jpg","spring.jpg",  "summer.jpg", "autumn.jpg","no_mosquito.jpg")
+)
 
 fun_plot_by_site <- function(th_site){
 
-df2 = df %>%
+df2 = df1 %>%
   mutate(effectif_jour=ifelse(site=="BAYONNE" & week==1 & year==2024, 1000, effectif_jour)) %>%
   mutate(effectif_jour=ifelse(site=="SAINT-MEDARD-EN-JALLES" & week==1 & year==2024, 1000, effectif_jour)) %>%
   filter(site==th_site)
 
 p_th_site <- ggplot(df2, aes(x = date)) +
   geom_col(aes(y = RFD), fill = "lightblue", alpha = 0.6) +  # Rainfall as bars
-  geom_line(aes(y = TMN, color = "Temperature"), size = 0.5) +  # Temperature as line
+  ggalt::geom_xspline(aes(y = TMN, color = "Temperature"), size = 0.5) +  # Temperature as line
   geom_point(aes(y = effectif_jour * scaleFactor,  color = "Eggs/trap"), size = 0.7) +
   geom_line(data=df2[!is.na(df2$effectif_jour),], aes(y = effectif_jour * scaleFactor, color = "Eggs/trap"), size = 0.5) +  # Scaled mosquito abundance
+  geom_vline(xintercept = c(as.Date(paste(2023,  c(18, 27, 35, 44 ), 1, sep = "-"), "%Y-%U-%u"),as.Date(paste(2024,  c(18, 27, 35, 44 ), 1, sep = "-"), "%Y-%U-%u")), linetype = "dashed", size = 0.2) +
+  geom_image(data = icons, aes(x = date, y = y, image = image), size = 0.1) +
   scale_y_continuous(
     name = "T°/Rain",
     limits = c(0,60),

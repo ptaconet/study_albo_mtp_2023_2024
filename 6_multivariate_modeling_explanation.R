@@ -254,7 +254,8 @@ saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcas
 ###########################################
 ###########################################
 
-meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv"))
+meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
+  dplyr::filter(!(site %in% c("RENNES","MONTPELLIER")))
 
 
 fun_pred_presence <- function(df_model_presence, predictors_presence, th_site){
@@ -338,10 +339,10 @@ for(i in 1:length(sites)){
   pred_llo_abundance <- rbind(pred_llo_abundance,th_pred_llo_abundance)
 
 
-  th_pred_llo <- pred_llo_pres %>%
+  th_pred_llo <- th_pred_llo_pres %>%
     filter(pred == "Absence") %>%
     mutate(pred_abundance=0) %>%
-    bind_rows(pred_llo_abundance) %>%
+    bind_rows(th_pred_llo_abundance) %>%
     mutate(pred_abundance = ifelse(pred=="Presence", exp(pred_abundance), 0)) %>%
     mutate(date = as.Date(date))
 

@@ -487,7 +487,7 @@ library(lime)
 meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
   mutate(date=as.Date(date)) %>%
   mutate(week = week(date), Year = year(date)) %>%
-  dplyr::filter(date>as.Date("2023-01-01"))
+  dplyr::filter(date>=as.Date("2023-01-01"))
 
 
 
@@ -655,6 +655,7 @@ plot_lime_v2 <- function(explanation){
 
   p1 <- ggplot(explanation, aes_(~date, ~feature_char)) +
     geom_tile(aes_(fill = ~feature_weight)) +
+    geom_vline(xintercept = c(as.Date(paste(2023,  c(18, 27, 35, 44 ), 1, sep = "-"), "%Y-%U-%u"),as.Date(paste(2024,  c(18, 27, 35, 44 ), 1, sep = "-"), "%Y-%U-%u")), linetype = "dashed", size = 0.2) +
     scale_y_discrete("Feature",expand = c(0, 0)) +
     #scale_fill_gradient2("Feature weight",low = "firebrick", mid = "#f7f7f7", high = "steelblue",  limit = c(-2,2.5), n.breaks = 5, labels = c("Important - reduce","","no weight","","Important - raises")) +
     scale_fill_gradientn(
@@ -667,7 +668,7 @@ plot_lime_v2 <- function(explanation){
     ) +
     theme_light() +
     theme(panel.border = element_rect(fill = NA,colour = "grey60", size = 0.5),
-          #panel.grid = element_blank(),
+          panel.grid = element_blank(),
           legend.position = "right",
           axis.title.y = element_blank(),
           axis.title.x = element_blank(),
@@ -690,8 +691,8 @@ plot_lime_v2 <- function(explanation){
 
 df_cv_paul <- df_cv_paul %>%
   mutate(date = as.Date(paste(Year, week, 1, sep="-"), "%Y-%U-%u"))  %>%
-  add_row(site = "BAYONNE", Year = 2024, week = 1, pred_stat_nowcasting = 1000, pred_stat_forecasting = NA) %>%
-  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, pred_stat_nowcasting = 1000, pred_stat_forecasting = NA)
+  add_row(site = "BAYONNE", Year = 2024, week = 1, pred_stat_nowcasting = 2000, pred_stat_forecasting = NA) %>%
+  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, pred_stat_nowcasting = 2000, pred_stat_forecasting = NA)
 
 # df_cv_paul <- read.csv("pred_llo.csv") %>%
 #   mutate(date = as.Date(date)) %>%
@@ -702,22 +703,22 @@ df_cv_paul <- df_cv_paul %>%
 scaleFactor = 0.6
 
 dd_perols <- p_perols +
-  #geom_point(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  geom_point(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="PEROLS"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
   scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_murviels <- p_murviels +
-  #geom_point(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  geom_point(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
   scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_bayonne <- p_bayonne +
-  #geom_point(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  geom_point(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="BAYONNE"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
   scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
 dd_medard <- p_medard +
-  #geom_point(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
+  geom_point(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor,  color = "Predictions (ML)"), size = 0.7) +
   geom_line(data=df_cv_paul %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(y = pred_stat_nowcasting * scaleFactor, color = "Predictions (ML)"), size = 0.5) +
   scale_color_manual(labels = c("Observations","Predictions (ML)","Temperatures"), values = c("Temperature" = "orange", "Eggs/trap" = "#49423c", "Predictions (ML)" = "#457b9d"))
 
