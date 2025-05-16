@@ -112,7 +112,7 @@ df %>%
   mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER",  "BAYONNE","SAINT-MEDARD-EN-JALLES" , "RENNES" ))) %>%
   ggplot(aes(x = date, y = value, color = name, group = name, size = ifelse(name %in% c("obs_mathematical","obs_statistical"), 0.6, 0.5))) +
   geom_line() +
-  #geom_point(size = 0.5) +
+  geom_point(size = 0.4) +
   #ggh4x::facet_grid2(cols = vars(model), rows = vars(site), scales = "free_y", independent = "y") +
   facet_grid(cols = vars(site), rows = vars(model), scales = "free_y") +
  scale_color_manual(values = c(
@@ -217,13 +217,19 @@ pfun_abundance <- function(object, newdata) {
   p <- predict(object, newdata = newdata)
 }
 
+# Mean absolute error
+spear <- function(truth, estimate) {
+  cor(truth, estimate, method = "spearman")
+}
+
+
 vis_presence <- data.frame()
 vis_abundance <- data.frame()
 
 for(i in 1:length(sites)){
 
   th_vis_presence <- vi(model_presence_nowcasting, method = "permute", train = df_mod_presence_nowcasting %>% dplyr::filter(site==sites[i]), target = "PRES_ALBO", metric = "roc_auc",pred_wrapper = pfun_presence, nsim = 30, event_level = 'first', feature_names = model_presence_nowcasting$finalModel$xNames)
-  th_vis_abundance <- vi(model_abundance_nowcasting, method = "permute", train = df_mod_abundance_nowcasting %>% dplyr::filter(site==sites[i]), target = "NB_ALBO_TOT", metric = "rsq",pred_wrapper = pfun_abundance, nsim = 30, feature_names = model_abundance_nowcasting$finalModel$xNames)
+  th_vis_abundance <- vi(model_abundance_nowcasting, method = "permute", train = df_mod_abundance_nowcasting %>% dplyr::filter(site==sites[i]), target = "NB_ALBO_TOT", metric = spear, smaller_is_better = FALSE, pred_wrapper = pfun_abundance, nsim = 30, feature_names = model_abundance_nowcasting$finalModel$xNames)
 
   th_vis_presence$site = sites[i]
   th_vis_abundance$site = sites[i]
@@ -249,9 +255,9 @@ vip_presence <- ggplot(vis_presence, aes(x = Variable, y = Importance, fill = si
   geom_bar(position="dodge", stat="identity") +
   theme_bw() +
   ggtitle("Presence model") +
-  ylab("Variable importance") +
+  ylab("Variable importance\n(loss in ROC AUC)") +
   theme( axis.title.x=element_blank(),
-        axis.text.y=element_text(size=7)#,
+        axis.text.y=element_text(size=8)#,
         #axis.title.y = element_text(size=10)
         ) +
   scale_x_discrete(guide = guide_axis(angle = 0)) +
@@ -263,9 +269,9 @@ vip_abundance <- ggplot(vis_abundance, aes(x = Variable, y = Importance, fill = 
   geom_bar(position="dodge", stat="identity") +
   theme_bw() +
   ggtitle("Abundance model") +
-  ylab("Variable importance") +
+  ylab("Variable importance\n(loss in Spearman corr.)") +
   theme(axis.title.x=element_blank(),
-        axis.text.y=element_text(size=7)#,
+        axis.text.y=element_text(size=8)#,
         #axis.title.y = element_text(size=10)
         ) +
   scale_x_discrete(guide = guide_axis(angle = 0)) +
@@ -319,9 +325,9 @@ for(i in 1:length(variables_presence)){
                          grepl("UM",variables_presence[i]) ~ "(%)",
                          grepl("RR",variables_presence[i]) ~ "(mm)"))) +
     theme(legend.position = "none",
-          axis.text.y=element_text(size=7),
-          axis.title.y = element_text(size=10)#,
-          #axis.title.x = element_text(size=10)
+          axis.text.y=element_text(size=8),
+          axis.title.y = element_text(size=10),
+          axis.title.x = element_text(size=10)
           ) +
     scale_color_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7"))
 
@@ -381,9 +387,9 @@ for(i in 1:length(variables_abundance)){
                          grepl("UM",variables_abundance[i]) ~ "(%)",
                          grepl("RR",variables_abundance[i]) ~ "(mm)"))) +
     theme(legend.position = "bottom",
-          axis.text.y=element_text(size=7),
-          axis.title.y = element_text(size=10)#,
-          #axis.title.x = element_text(size=10)
+          axis.text.y=element_text(size=8),
+          axis.title.y = element_text(size=10),
+          axis.title.x = element_text(size=10)
           ) +
     scale_color_manual(values = c("#8d5a99","#ff9e17","#7d8be3","#e95ab7"))
 
@@ -417,7 +423,7 @@ pdp_interaction_abundance <- ggplot() +
   guides(size = "none") +
   theme(#legend.position = "bottom",
         legend.title=element_text(size=10),
-        axis.text.y=element_text(size=7),
+        axis.text.y=element_text(size=8),
         axis.title.x = element_text(size=10),
         axis.title.y = element_text(size=10))
 
@@ -464,19 +470,33 @@ row2 <- vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] + pdps_abundan
 
 # Row 1
 row1 <- vip_presence + pdps_presence[[1]] + pdps_presence[[2]] +
-  plot_spacer() + plot_spacer() + plot_spacer() +
-  plot_layout(ncol = 6, widths = c(1, 1, 1, 1.4, 1.4, 1.3), axis_titles = "collect")
+  plot_spacer() + plot_spacer() +
+  plot_layout(ncol = 5, widths = c(1, 1, 1, 1, 2.1), axis_titles = "collect")
 
 # Row 2: make last plot wider
 row2 <- vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +
-  pdps_abundance[[3]] + pdp_tmax + pdp_interaction_abundance +
-  plot_layout(ncol = 6, widths = c(1, 1, 1, 1, 1, 1.6),guides = 'collect', axis_titles = "collect")  # <– wider last plot!
+  pdps_abundance[[3]] + pdp_interaction_abundance +
+  plot_layout(ncol = 5, widths = c(1, 1, 1, 1, 1.6),guides = 'collect', axis_titles = "collect")  # <– wider last plot!
 
 # Combine rows
 row1 / row2 +
   plot_layout(nrow = 2, guides = 'collect', axis_titles = "collect") &
   theme(legend.position = 'bottom')
-
+#
+#
+# row1 <- vip_presence + pdps_presence[[1]] + pdps_presence[[2]] +
+#   plot_layout(ncol = 3, widths = c(1, 1, 1), axis_titles = "collect")
+#
+# row2 <- vip_abundance + pdps_abundance[[1]] + pdps_abundance[[2]] +
+#   plot_layout(ncol = 3, widths = c(1, 1, 1), axis_titles = "collect")
+#
+# row3 <- pdps_abundance[[3]] + pdp_interaction_abundance +
+#   plot_layout(ncol = 3, widths = c(1, 1.5, 0.5),guides = 'collect', axis_titles = "collect")
+#
+#
+# row1 / row2 / row3 +
+#   plot_layout(nrow = 3, guides = 'collect', axis_titles = "collect") &
+#   theme(legend.position = 'bottom')
 
 ########################s
 ## Local interpretation
@@ -494,10 +514,10 @@ meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
 fun_get_lime <- function(th_site){
 
   df_mod_presence_nowcasting_lime <- df_mod_presence_nowcasting %>% dplyr::select(variables_presence,"site")
-  explainer_presence <- lime(df_mod_presence_nowcasting_lime, model_presence_nowcasting, n_bins = 15)
+  explainer_presence <- lime(df_mod_presence_nowcasting_lime, model_presence_nowcasting, n_bins = 6)
 
   df_mod_abundance_nowcasting_lime <- df_mod_abundance_nowcasting %>% dplyr::select(variables_abundance,"site")
-  explainer_abundance <- lime(df_mod_abundance_nowcasting_lime, model_abundance_nowcasting, n_bins = 15)
+  explainer_abundance <- lime(df_mod_abundance_nowcasting_lime, model_abundance_nowcasting, n_bins = 6)
 
 # x_presence = df_mod_presence_nowcasting %>%
 #   filter(site==th_site)
@@ -546,7 +566,7 @@ explanation_abundance <- explain(
 
 x_abundance <- x_abundance %>%
   slice(rep(1:n(), each = length(c(variables_abundance,"site")))) %>%
-  #slice(rep(1:n(), each = length(variables_presence))) %>%
+  #slice(rep(1:n(), each = length(variables_abundance))) %>%
   dplyr::select(site, Year, week)
 
 explanation_abundance <- explanation_abundance %>%
@@ -604,6 +624,7 @@ plot_lime_v1 <- function(explanation){
 
   p1 <- ggplot(explanation, aes_(~date, ~feature_desc)) +
     geom_tile(aes_(fill = ~feature_weight)) +
+    geom_vline(xintercept = c(as.Date(paste(2023,  c(18, 27, 35, 44 ), 1, sep = "-"), "%Y-%U-%u"),as.Date(paste(2024,  c(18, 27, 35, 44 ), 1, sep = "-"), "%Y-%U-%u")), linetype = "dashed", size = 0.2) +
     scale_y_discrete("Feature",expand = c(0, 0)) +
     #scale_fill_gradient2("Feature weight",low = "firebrick", mid = "#f7f7f7", high = "steelblue",  limit = c(-2,2.5), n.breaks = 5, labels = c("Important - reduce","","no weight","","Important - raises")) +
     scale_fill_gradientn(

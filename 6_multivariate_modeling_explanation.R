@@ -118,11 +118,11 @@ df_model_abundance <- df_model %>%
 #########' For presence models
 ###########################
 
-#predictors_presence <- c(predictors_presence,"site")
-#predictors_abundance <- c(predictors_abundance,"site")
+# predictors_presence <- c(predictors_presence,"site")
+# predictors_abundance <- c(predictors_abundance,"site")
 
 #### First step: to parameter the model: leave-one-site-out cross validation
-cv_col <- "site"
+cv_col <- "Year"
 
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
@@ -161,7 +161,7 @@ saveRDS(res_multiv_model_presence_nowcasting,"res_multiv_model_presence_nowcasti
 
 df_model_abundance$NB_ALBO_TOT <- log(df_model_abundance$NB_ALBO_TOT)
 
-cv_col <- "site"
+cv_col <- "Year"
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance, spacevar = cv_col,k = length(unique(unlist(df_model_abundance[,cv_col]))))
@@ -170,7 +170,7 @@ indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance, spacevar = cv_col,k
 ## Optimising the various model parameters: finding them as a function of predictive power, in relation to a predictive value (ROC, MAE, etc)
 
 spearmcor <- function(data,lev = NULL,model = NULL) {
-  out <- cor(x = data$pred, y = data$obs)
+  out <- cor(x = data$pred, y = data$obs, method = "spearman")
   names(out) <- "spearman"
   out
 }
