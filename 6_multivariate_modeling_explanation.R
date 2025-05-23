@@ -14,7 +14,7 @@ df_model <- read.csv(file.path("data","processed","df_to_model.csv"))
 df_model <- df_model %>%
   relocate(effectif_jour,.before = RR_0_0) %>%
   group_by(site, Year,week) %>%
-  summarise_at(vars(effectif_jour:RFNO), mean, na.rm = TRUE) %>%
+  summarise_at(vars(effectif_jour:photoperiod), mean, na.rm = TRUE) %>%
   ungroup()
 
 
@@ -118,8 +118,8 @@ df_model_abundance <- df_model %>%
 #########' For presence models
 ###########################
 
-# predictors_presence <- c(predictors_presence,"site")
-# predictors_abundance <- c(predictors_abundance,"site")
+ # predictors_presence <- c(predictors_presence,"site")
+ # predictors_abundance <- c(predictors_abundance,"site")
 
 #### First step: to parameter the model: leave-one-site-out cross validation
 cv_col <- "Year"
@@ -130,13 +130,16 @@ cv_col <- "Year"
 indices_cv <- CAST::CreateSpacetimeFolds(df_model_presence, spacevar = cv_col, k = length(unique(unlist(df_model_presence[,cv_col])))) #### Take into acocunt spatil avariability
 
 ## Optimising the various model parameters: finding them as a function of predictive power, in relation to a predictive value (ROC, MAE, etc)
-tr = trainControl(method="cv", ## Definition of method sampling: cross validation
+tr = trainControl(method="cv", ## Definition of method sampling: cross validation,
+                  #number = 5,
+                  #repeats = 5,
                   index = indices_cv$index,  ##  list of elements to sampling
                   indexOut = indices_cv$indexOut,##  list of items to be set aside for each resampling
                   summaryFunction = twoClassSummary,#comboSummary, ## Calcul of ROC and AUC
                   classProbs = TRUE,
                   savePredictions = 'final',
                   verboseIter = FALSE
+                  #search = "random"
 )
 
 
@@ -175,11 +178,15 @@ spearmcor <- function(data,lev = NULL,model = NULL) {
   out
 }
 
-tr = trainControl(method="cv",
+tr = trainControl(method="cv", ## repeatedcv
+                  #number = 5,
+                  #repeats = 5,
                   index = indices_cv$index,
                   indexOut = indices_cv$indexOut,
                   savePredictions = 'final',
-                  summaryFunction = spearmcor)
+                  summaryFunction = spearmcor
+                  #search = "random"
+                  )
 
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE
@@ -276,7 +283,7 @@ fun_pred_presence <- function(df_model_presence, predictors_presence, th_site){
                     verboseIter = FALSE
   )
 
-  mod_presence <- caret::train(x = df_model_presence2[,predictors_presence], y = df_model_presence2$PRES_ALBO, method = "ranger", tuneLength = 5, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"))
+  mod_presence <- caret::train(x = df_model_presence2[,predictors_presence], y = df_model_presence2$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"))
 
 
   meteo2 <- meteo %>%
@@ -307,7 +314,7 @@ fun_pred_abundance <- function(df_model_abundance, predictors_abundance, th_site
                     savePredictions = 'final',
                     summaryFunction = spearmcor)
 
-   mod_abundance <- caret::train(x = df_model_abundance2[,predictors_abundance], y = df_model_abundance2$NB_ALBO_TOT, method = "ranger", tuneLength = 5, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"))
+   mod_abundance <- caret::train(x = df_model_abundance2[,predictors_abundance], y = df_model_abundance2$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"))
 
 
    meteo2 <- meteo_pred %>%
@@ -365,3 +372,128 @@ ggplot() +
   facet_wrap(.~site)
 
 write.csv(pred_llo,"pred_llo.csv", row.names = F)
+
+
+
+
+
+
+
+###### lto
+
+meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
+  dplyr::filter(!(site %in% c("RENNES","MONTPELLIER"))) %>%
+  mutate(Year=lubridate::year(as.Date(date)))
+
+
+fun_pred_presence <- function(df_model_presence, predictors_presence, th_year){
+
+  df_model_presence2 <- df_model_presence %>%
+    filter(Year!=th_year)
+
+tr = trainControl(method="cv", ## Definition of method sampling: cross validation
+                  summaryFunction = twoClassSummary,#comboSummary, ## Calcul of ROC and AUC
+                  classProbs = TRUE,
+                  savePredictions = 'final',
+                  verboseIter = FALSE
+)
+
+#### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the ROC
+mod_presence <- caret::train(x = df_model_presence2[,predictors_presence], y = df_model_presence2$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"))
+
+meteo2 <- meteo %>%
+  dplyr::filter(Year==th_year) %>%
+  filter(!is.na(UM_5_11))
+
+pred <- predict(mod_presence,meteo2)
+pred_prob <- predict(mod_presence, meteo2, type = 'prob')$Presence
+
+df_cv_presence <- cbind(meteo2, pred, pred_prob)
+
+return(df_cv_presence)
+}
+
+fun_pred_abundance <- function(df_model_abundance, predictors_abundance, th_year, meteo_pred){
+
+  df_model_abundance2 <- df_model_abundance %>%
+    filter(Year!=th_year)
+
+
+  tr = trainControl(method="cv",
+                    savePredictions = 'final',
+                    summaryFunction = spearmcor)
+
+  mod_abundance <- caret::train(x = df_model_abundance2[,predictors_abundance], y = df_model_abundance2$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"))
+
+
+  meteo2 <- meteo_pred %>%
+    filter(!is.na(UM_5_11))
+
+  pred_abundance <- predict(mod_abundance,meteo2)
+
+  df_cv_abundance<- cbind(meteo2, pred_abundance)
+
+  return(df_cv_abundance)
+}
+
+
+year <- unique(df_model_presence$Year)
+
+pred_lto_pres <- data.frame()
+pred_lto_abundance <- data.frame()
+pred_lto <- data.frame()
+
+for(i in 1:length(year)){
+
+  th_pred_lto_pres <- fun_pred_presence(df_model_presence,predictors_presence,year[i])
+  pred_lto_pres <- rbind(pred_lto_pres,th_pred_lto_pres)
+
+  meteo_pred <- th_pred_lto_pres %>%
+    filter(pred == "Presence")
+
+  th_pred_lto_abundance <- fun_pred_abundance(df_model_abundance,predictors_abundance,year[i], meteo_pred)
+  pred_lto_abundance <- rbind(pred_lto_abundance,th_pred_lto_abundance)
+
+
+  th_pred_lto <- th_pred_lto_pres %>%
+    filter(pred == "Absence") %>%
+    mutate(pred_abundance=0) %>%
+    bind_rows(th_pred_lto_abundance) %>%
+    mutate(pred_abundance = ifelse(pred=="Presence", exp(pred_abundance), 0)) %>%
+    mutate(date = as.Date(date))
+
+  pred_lto <- rbind(pred_lto,th_pred_lto)
+
+}
+
+pred_lto$Year <- year(pred_lto$date)
+pred_lto$week <- week(pred_lto$date)
+
+
+df_model <- df_model %>%
+  mutate(date = as.Date(paste(Year, week, 1, sep = "-"), "%Y-%U-%u"))
+
+ggplot() +
+  geom_line(data = pred_lto, aes(x = date, y = pred_abundance, group = site), color = "red") +
+  geom_line(data = df_model, aes(x = date, y = NB_ALBO_TOT, group = site), color = "black") +
+  facet_wrap(.~site)
+
+write.csv(pred_llo,"pred_lto.csv", row.names = F)
+
+
+ggplot() +
+  geom_line(data = pred_lto %>% filter(site %in% c("MURVIEL-LES-MONTPELLIER","PEROLS")), aes(x = date, y = pred_abundance, group = site, color = site)) +
+  geom_line(data = df_model %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(x = date, y = NB_ALBO_TOT), color = "black")
+
+ggplot() +
+  geom_line(data = pred_lto %>% filter(site %in% c("BAYONNE","SAINT-MEDARD-EN-JALLES")), aes(x = date, y = pred_abundance, group = site, color = site)) +
+  geom_line(data = df_model %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(x = date, y = NB_ALBO_TOT), color = "black")
+
+
+pred_lto2 <- pred_lto %>%
+  left_join(df_model %>% dplyr::select(site,Year,  week, NB_ALBO_TOT), by = c("site","Year","week")) %>%
+  dplyr::select(site, date, NB_ALBO_TOT, pred_abundance ) %>%
+  pivot_wider(names_from = site, values_from = c("pred_abundance","NB_ALBO_TOT")) %>%
+  dplyr::select(-date)
+
+View(cor(pred_lto2, use = "na.or.complete"))

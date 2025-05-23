@@ -72,12 +72,15 @@ indices_cv <- CAST::CreateSpacetimeFolds(df_model_presence, spacevar = cv_col, k
 
 ## Optimising the various model parameters: finding them as a function of predictive power, in relation to a predictive value (ROC, MAE, etc)
 tr = trainControl(method="cv", ## Definition of method sampling: cross validation
+                  #number = 5,
+                  #repeats = 5,
                   index = indices_cv$index,  ##  list of elements to sampling
                   indexOut = indices_cv$indexOut,##  list of items to be set aside for each resampling
                   summaryFunction = twoClassSummary,#comboSummary, ## Calcul of ROC and AUC
                   classProbs = TRUE,
                   savePredictions = 'final',
                   verboseIter = FALSE
+                  #search = "random"
 )
 
 
@@ -112,10 +115,14 @@ spearmcor <- function(data,lev = NULL,model = NULL) {
 
 ## Optimising the various model parameters: finding them as a function of predictive power, in relation to a predictive value (ROC, MAE, etc)
 tr = trainControl(method="cv",
+                  #number = 5,
+                  #repeats = 5,
                   index = indices_cv$index,
                   indexOut = indices_cv$indexOut,
                   savePredictions = 'final',
-                  summaryFunction = spearmcor)
+                  summaryFunction = spearmcor
+                  #search = "random"
+)
 
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE

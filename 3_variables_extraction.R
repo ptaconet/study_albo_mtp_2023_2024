@@ -238,5 +238,10 @@ df_to_model <- pieges_data %>%
   left_join(df_meteo_pieges_summ_wide_meteofrance)
 
 
+# photoperiode
+df_to_model_photo <- df_to_model %>% dplyr::select(date_releve,Latitude,Longitude) %>% mutate(date_releve=as.Date(date_releve)) %>% rename(date=date_releve,lat=Latitude, lon=Longitude)
+photoperiod <- suncalc::getSunlightTimes( data = df_to_model_photo)
+df_to_model$photoperiod <- as.numeric(photoperiod$sunset-photoperiod$sunrise)
+
 
 write.csv(df_to_model,file.path("data","processed","df_to_model.csv"), row.names = F)

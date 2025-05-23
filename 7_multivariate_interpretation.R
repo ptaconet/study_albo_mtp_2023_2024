@@ -96,8 +96,9 @@ df <- df_cv_andrea %>%
   filter(site!="RENNES")
 
 df %>%
-  add_row(site = "BAYONNE", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA, pred_stat_forecasting = NA) %>%
-  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA, pred_stat_forecasting = NA) %>%
+  dplyr::select(-pred_stat_forecasting) %>%
+  add_row(site = "BAYONNE", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA) %>%
+  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA) %>%
   rename(obs_mathematical = obs) %>%
   mutate(obs_statistical = obs_mathematical) %>%
   group_by(site) %>%
@@ -107,7 +108,9 @@ df %>%
   mutate(date = as.Date(paste(Year, week, 1, sep = "-"), "%Y-%U-%u")) %>%
   mutate(model = case_when(
     name %in% c("obs_mathematical","pred_metelmann", "pred_arbocarto") ~ 'Mathematical models',
-    name %in% c("obs_statistical", "pred_stat_nowcasting","pred_stat_forecasting") ~ 'Statistical models'  )) %>%
+    #name %in% c("obs_statistical", "pred_stat_nowcasting","pred_stat_forecasting") ~ 'Statistical models'  )) %>%
+    name %in% c("obs_statistical", "pred_stat_nowcasting") ~ 'Machine learning model'  )) %>%
+  mutate(model = fct_relevel(model, c('Mathematical models','Machine learning model'))) %>%
   # Duplicate "obs" so it appears in both "mathematical" and "statistical" facets
   mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER",  "BAYONNE","SAINT-MEDARD-EN-JALLES" , "RENNES" ))) %>%
   ggplot(aes(x = date, y = value, color = name, group = name, size = ifelse(name %in% c("obs_mathematical","obs_statistical"), 0.6, 0.5))) +
@@ -131,16 +134,17 @@ df %>%
   labels = c(
     "obs_mathematical" = "Observations",
     "obs_statistical" = "",
-    "pred_arbocarto" = "Arbocarto",
-    "pred_metelmann" = "Metelmann",
+    "pred_arbocarto" = "Arbocarto predictions",
+    "pred_metelmann" = "Metelmann predictions",
     #"pred_stat_explanatory" = "ML explanatory",
-    "pred_stat_nowcasting" = "ML nowcasting",
+    "pred_stat_nowcasting" = "ML predictions",
     "pred_stat_forecasting" = "ML forecasting"))+
   scale_size_identity() +
   ylab("Egg abundance") +
   labs(color = 'Model') +
   theme(
     legend.position = "bottom",
+    legend.title = element_blank(),
     panel.background = element_blank(),
     axis.line = element_line(colour = "grey"),
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8),
@@ -538,8 +542,8 @@ explanation_presence <- explain(
 )
 
 x_presence <- x_presence %>%
-  slice(rep(1:n(), each = length(c(variables_presence,"site")))) %>%
-  #slice(rep(1:n(), each = length(variables_presence))) %>%
+  #slice(rep(1:n(), each = length(c(variables_presence,"site")))) %>%
+  slice(rep(1:n(), each = length(variables_presence))) %>%
   dplyr::select(site, Year, week)
 
 explanation_presence <- explanation_presence %>%
@@ -565,8 +569,8 @@ explanation_abundance <- explain(
   feature_select = "highest_weights")
 
 x_abundance <- x_abundance %>%
-  slice(rep(1:n(), each = length(c(variables_abundance,"site")))) %>%
-  #slice(rep(1:n(), each = length(variables_abundance))) %>%
+  #slice(rep(1:n(), each = length(c(variables_abundance,"site")))) %>%
+  slice(rep(1:n(), each = length(variables_abundance))) %>%
   dplyr::select(site, Year, week)
 
 explanation_abundance <- explanation_abundance %>%
