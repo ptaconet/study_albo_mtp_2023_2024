@@ -118,8 +118,8 @@ df_model_abundance <- df_model %>%
 #########' For presence models
 ###########################
 
- # predictors_presence <- c(predictors_presence,"site")
- # predictors_abundance <- c(predictors_abundance,"site")
+  #predictors_presence <- c(predictors_presence,"site")
+  #predictors_abundance <- c(predictors_abundance,"site")
 
 #### First step: to parameter the model: leave-one-site-out cross validation
 cv_col <- "Year"
