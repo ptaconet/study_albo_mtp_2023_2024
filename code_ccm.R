@@ -56,7 +56,7 @@ predictors <- setdiff(colnames(df_model), c("presence_oeufs", "date_releve", "we
 
 ## more code, but much faster :
 
-fun_compute_correlation_univ <- function(df,indicator){
+fun_compute_correlation_univ <- function(df,indicator, metric_name){
 
   if(indicator == "presence"){
     var_to_keep = "presence_oeufs"
@@ -66,7 +66,7 @@ fun_compute_correlation_univ <- function(df,indicator){
 
     func <- function(x){
       df2 <- df %>% dplyr::select(var_to_keep,!!x)
-      ret <- correlation::correlation(df2,method = "distance")
+      ret <- correlation::correlation(df2,method = metric_name) # metric_name = distance or spearman
       return(ret)
     }
 
@@ -79,6 +79,12 @@ fun_compute_correlation_univ <- function(df,indicator){
   spearman_univs$site <- unique(df$site)
   #spearman_univs$environment <- unique(df$environment)
 
+  if (metric_name=="spearman"){
+    spearman_univs <- spearman_univs %>% rename(r=rho)
+  }
+  if(metric_name=="distance"){
+    spearman_univs <- spearman_univs %>% mutate(r = ifelse(r<0,0,r))
+  }
 
   return(spearman_univs)
 }
@@ -87,19 +93,17 @@ fun_compute_correlation_univ <- function(df,indicator){
 # presence
 corr_univ_presence <- df_model %>%
   group_split(site) %>%
-  map_dfr(.,~fun_compute_correlation_univ(., "presence")) %>%
+  map_dfr(.,~fun_compute_correlation_univ(., "presence", "distance")) %>%
   as.tibble() %>%
-  mutate(indicator = "presence") %>%
-  mutate(r = ifelse(r<0,0,r))
+  mutate(indicator = "presence")
 
 # abundance
 corr_univ_abundance <- df_model %>%
   filter(effectif_jour>0) %>%
   group_split(site) %>%
-  map_dfr(.,~fun_compute_correlation_univ(., "abundance")) %>%
+  map_dfr(.,~fun_compute_correlation_univ(., "abundance", "distance")) %>%
   as.tibble() %>%
-  mutate(indicator = "abundance") %>%
-  mutate(r = ifelse(r<0,0,r))
+  mutate(indicator = "abundance")
 
 
 
@@ -110,13 +114,25 @@ corr_univ_abundance <- df_model %>%
 ##############v
 
 # function to plot the CCM (simple plot : only the CCM)
-fun_ccm_plot2 <- function(correlation_df, var){
+fun_ccm_plot2 <- function(correlation_df, var, metric_name, indicator){
 
-  if(length(unique(correlation_df$correlation))!=1){ # to deal with case all correlation values are NAs
-    most_corr <- correlation_df %>% filter(correlation == max(correlation, na.rm = T))
-    most_corr2 <- correlation_df %>% arrange(desc(correlation)) %>% filter(correlation >= most_corr$correlation * 0.9)
-  } else {
-    most_corr <- most_corr2 <- correlation_df[1,]
+  if(metric_name == "distance"){
+   if(length(unique(correlation_df$correlation))!=1){ # to deal with case all correlation values are NAs
+     most_corr <- correlation_df %>% filter(correlation == max(correlation, na.rm = T))
+     most_corr2 <- correlation_df %>% arrange(desc(correlation)) %>% filter(correlation >= most_corr$correlation * 0.9)
+   } else {
+     most_corr <- most_corr2 <- correlation_df[1,]
+   }
+  } else if (metric_name == "spearman"){
+
+      correlation_df$abs_corr <- abs(correlation_df$correlation)
+    if(!is.na(unique(correlation_df$abs_corr)[1])){ # to deal with case all correlation values are NAs
+      most_corr <- correlation_df %>% filter(abs_corr == max(abs_corr, na.rm = T))
+      most_corr2 <- correlation_df %>% arrange(desc(abs_corr)) %>% filter(abs_corr >= most_corr$abs_corr * 0.9)
+    } else {
+      most_corr <- most_corr2 <- correlation_df[1,]
+    }
+
   }
 
   ccm_plot <- ggplot(data = correlation_df, aes(time_lag_1, time_lag_2, fill = correlation)) +
@@ -134,9 +150,15 @@ fun_ccm_plot2 <- function(correlation_df, var){
     annotate("text", size = 3,x = min(correlation_df$time_lag_1), y = max(correlation_df$time_lag_2), vjust = "inward", hjust = "inward", label = paste0("r(",most_corr$time_lag_2,",",most_corr$time_lag_1,") = ",round(most_corr$correlation,2))) +
     coord_fixed() +
     ylab("time lag 1") +
-    xlab("time lag 2") +
-    scale_fill_gradient2(low = "white", high = "red", limit = c(0,1), space = "Lab", name = "Distance correlation", na.value = "grey")
+    xlab("time lag 2")
 
+  if(metric_name=="distance"){
+    ccm_plot <- ccm_plot +
+      scale_fill_gradient2(low = "white", high = "red", limit = c(0,1), space = "Lab", name = "Distance correlation", na.value = "grey")
+  } else if(metric_name=="spearman"){
+    ccm_plot <- ccm_plot +
+      scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-.8,.8), space = "Lab", name = "Spearman correlation", na.value = "grey")
+  }
 
   return(ccm_plot)
 
@@ -174,7 +196,7 @@ plots_univ_spearman_temporal_mf <- univ_spearman_temporal_mf %>%
   #arrange(rev(indicator),factor(var, levels = c("TM","TN","TX","TAMPLI","GDDjour","GDDacc","GDDbound","UM","RR","RRMAX","DRR","FFM","FXY")),factor(environment, levels = c("MEDITERRANEAN","ATLANTIC"))) %>%
   dplyr::filter(!var %in% c("GDDjour","GDDacc","GDDbound","TAMPLI")) %>%
   #dplyr::filter(!var %in% c("GDDjour","GDDacc","GDDbound","TAMPLI","FXY","DRR","RRMAX")) %>%
-  mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1]))) %>%
+  mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1], metric_name = "distance", ..2))) %>%
   nest(-c(site,indicator)) %>%
   mutate(univ_temporal = map(data, ~patchwork::wrap_plots(.x$univ_temporal, nrow = 1, ncol = 9))) %>%
   mutate(univ_temporal = pmap(list(univ_temporal,site), ~..1 + patchwork::plot_annotation(title = ..2))) %>%

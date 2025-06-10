@@ -41,13 +41,13 @@ coords = as.data.frame(coords)
 coords$site <- seq(1:nrow(coords))
 
 meteo_prep <- coords %>%
-  group_by(row_number() %/% 50) %>%
+  group_by(row_number() %/% 100) %>%
   group_map(~.x) %>%
   map(.,~group_split(.,site))
 
 # what data have already been downloaded ?
 
-already_dl <- as.numeric(list.files("data/raw/meteofrance_2023"))
+already_dl <- as.numeric(list.files("data/raw/meteofrance_2025"))
 
 for(i in 1:length(meteo_prep)){
 
@@ -56,23 +56,23 @@ for(i in 1:length(meteo_prep)){
   cat("Dealing with data package",i,"over",length(meteo_prep),"\n")
 
     # for year 2023
-    th_meteo <- map(meteo_prep[[i]], ~openmeteo::weather_history(
-      location = c(.$Y, .$X),
-      daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
-      start = as.Date("2023-01-01"),
-      end = as.Date("2023-12-31")))
+    # th_meteo <- map(meteo_prep[[i]], ~openmeteo::weather_history(
+    #   location = c(.$Y, .$X),
+    #   daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
+    #   start = as.Date("2023-01-01"),
+    #   end = as.Date("2023-12-31")))
 
-    # for year 2024 :
-   # th_meteo <- map(meteo_prep[[i]], ~openmeteo::weather_history(
-   #   location = c(.$Y, .$X),
-   #   daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
-   #   model = "arome_france",
-   #   start = as.Date("2024-01-01"),
-   #   end = as.Date("2024-12-31")))
+    # for year 2024 and 2025 :
+   th_meteo <- map(meteo_prep[[i]], ~openmeteo::weather_history(
+     location = c(.$Y, .$X),
+     daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
+     model = "meteofrance_arome_france_hd",
+     start = as.Date("2025-01-01"),
+     end = as.Date("2025-06-05")))
 
   th_res <- map2_dfr(meteo_prep[[i]], th_meteo, ~bind_cols(.x, .y,))
 
-  write.csv(th_res,paste0("data/raw/meteofrance_2023/",i), row.names = F)
+  write.csv(th_res,paste0("data/raw/meteofrance_2025/",i), row.names = F)
 
   system('sleep 60') # to avoid status code 429 :  Minutely API request limit exceeded.
 
@@ -84,7 +84,7 @@ for(i in 1:length(meteo_prep)){
 # forecast data
 
 meteo_prep <- coords %>%
-  group_by(row_number() %/% 200) %>%
+  group_by(row_number() %/% 300) %>%
   group_map(~.x) %>%
   map(.,~group_split(.,site))
 
@@ -100,7 +100,7 @@ for(i in 1:length(meteo_prep)){
     th_meteo <- map(meteo_prep[[i]], ~openmeteo::weather_forecast(
       location = c(.$Y, .$X),
       daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
-      start = today() - 1,
+      start = today(),
       end = today() + 15))
 
     th_res <- map2_dfr(meteo_prep[[i]], th_meteo, ~bind_cols(.x, .y,))
@@ -124,8 +124,10 @@ meteo_future <- list.files(file.path("data","raw","meteofrance_2025_forecast"), 
 meteo <- rbind(meteo_past,meteo_future)
 
 
-meteo <- list.files(file.path("data","raw","meteofrance_2023"), full.names = T) %>%
+meteo <- list.files(file.path("data","raw","meteofrance_2024"), full.names = T) %>%
   purrr::map_dfr(.,~read.csv(.))
+
+
 
 library(data.table)
 meteo <- data.table(meteo)
@@ -352,8 +354,7 @@ df_meteo_predictions <- df_meteo_predictions %>%
   mutate(pred_abundance = ifelse(pred_presence_absence=="Absence",0,exp(predict(multiv_model_abundance_nowcasting$model,.))))
 
 df_meteo_predictions <- df_meteo_predictions %>%
-  left_join(coords_retain) %>%
-  filter(date>="2025-01-01")
+  left_join(coords_retain)
 
 
 # to create a regular grid (evenly spaced)
@@ -366,16 +367,22 @@ df_meteo_predictions <- df_meteo_predictions %>%
 #   )
 
 
+# communes avec Albo
+
+france_albo <- st_read("/home/ptaconet/contributions_diverses_projets_mivegec/study_albo_mtp_2023_2024/shp_alto_colonization/transfer_9935526_files_4caef5ee/France_albopictus_year_colonization.shp")
+france_albo <- st_transform(france_albo,4326)
+france_albo <- france_albo %>% filter(presence == 1)
+
 ### plot non animate - vector
 ggplot()+
   geom_sf(data=france, color="cornsilk4", linewidth=0, alpha=1) +
-  geom_tile(data = df_meteo_predictions, aes(x = X, y = Y, fill=pred_abundance)) +
+  geom_tile(data = df_meteo_predictions %>% filter(date>"2024-04-15"), aes(x = X, y = Y, fill=pred_abundance)) +
+  #geom_sf(data=st_centroid(france_albo), size = 0.005) +
   facet_wrap(~date)+
   scale_fill_gradientn(
     colours = c("blue", "white", "red"),  # 0 = blue, high = red
     values = scales::rescale(c(0, 0.001, max(df_meteo_predictions$pred_abundance, na.rm = TRUE))),
-    limits = c(0, max(df_meteo_predictions$pred_abundance, na.rm = TRUE)),
-    oob = scales::squish
+    limits = c(0, max(df_meteo_predictions$pred_abundance, na.rm = TRUE))
   ) +
   theme_minimal()
 
@@ -387,7 +394,13 @@ p <- ggplot() +
   geom_sf(data = france, color = "cornsilk4", linewidth = 0.3, fill = NA) +
   geom_tile(
     data = df_meteo_predictions,
-    aes(x = X_snap, y = Y_snap, fill = pred_presence_absence)
+    aes(x = X_snap, y = Y_snap, fill = pred_abundance)
+  ) +
+  scale_fill_gradientn(
+    colours = c("blue", "white", "red"),  # 0 = blue, high = red
+    values = scales::rescale(c(0, 0.001, max(df_meteo_predictions$pred_abundance, na.rm = TRUE))),
+    limits = c(0, max(df_meteo_predictions$pred_abundance, na.rm = TRUE)),
+    oob = scales::squish
   ) +
   coord_sf(default_crs = NULL) +
   theme_minimal() +
@@ -399,20 +412,33 @@ p <- ggplot() +
   ) +
   ease_aes("linear")
 
-animate(p, width = 800, height = 600, fps = 4, duration = 10, renderer = gifski_renderer("prediction_animation.gif"))
+animate(p, width = 800, height = 600, fps = 2, duration = 20, renderer = gifski_renderer("prediction_animation.gif"))
+
+
+
+
 
 
 
 ## rasterize
 
-res_x <- min(diff(sort(unique(df_meteo_predictions$X))))
-res_y <- min(diff(sort(unique(df_meteo_predictions$Y))))
+# to create a regular grid (evenly spaced)
+grid_res <- 0.05
+
+df_meteo_predictions <- df_meteo_predictions %>%
+  mutate(
+    X_snap = round(X / grid_res) * grid_res,
+    Y_snap = round(Y / grid_res) * grid_res
+  )
+
+res_x <- min(diff(sort(unique(df_meteo_predictions$X_snap))))
+res_y <- min(diff(sort(unique(df_meteo_predictions$Y_snap))))
 
 # Compute raster extent from centers
-xmin <- min(df_meteo_predictions$X) - res_x / 2
-xmax <- max(df_meteo_predictions$X) + res_x / 2
-ymin <- min(df_meteo_predictions$Y) - res_y / 2
-ymax <- max(df_meteo_predictions$Y) + res_y / 2
+xmin <- min(df_meteo_predictions$X_snap) - res_x / 2
+xmax <- max(df_meteo_predictions$X_snap) + res_x / 2
+ymin <- min(df_meteo_predictions$Y_snap) - res_y / 2
+ymax <- max(df_meteo_predictions$Y_snap) + res_y / 2
 
 # Create template raster
 r_template <- rast(
@@ -425,12 +451,7 @@ r_template <- rast(
 df_meteo_predictions$date <- as.character(df_meteo_predictions$date)
 
 # Convert to SpatVector
-v <- vect(df_meteo_predictions, geom = c("X", "Y"), crs = "EPSG:4326")
-
-df_meteo_predictions$date <- as.character(df_meteo_predictions$date)
-
-# Convert to SpatVector
-v <- vect(df_meteo_predictions, geom = c("X", "Y"), crs = "EPSG:4326")
+v <- vect(df_meteo_predictions, geom = c("X_snap", "Y_snap"), crs = "EPSG:4326")
 
 # Unique dates
 dates <- unique(df_meteo_predictions$date)
@@ -438,8 +459,10 @@ dates <- unique(df_meteo_predictions$date)
 # Rasterize each date separately
 rasters <- lapply(dates, function(d) {
   v_d <- v[v$date == d, ]
-  r <- rasterize(v_d, r_template, field = "presence_flag", fun = "max")  # mean
+  r <- terra::rasterize(v_d, r_template, field = "pred_abundance", fun = "mean")
   names(r) <- d
+  #d = gsub("-","",d)
+  #writeRaster(r,paste0("data/raw/results_raster_2024/aedesabundance_",d,".tif"))
   r
 })
 
@@ -448,6 +471,70 @@ r_stack <- rast(rasters)
 
 #plot
 plot(r_stack, col = c("orange","steelblue"), legend = TRUE)
+
+
+
+library(exactextractr)
+
+communes_abundance <- exact_extract(r_stack, france_albo, 'mean')
+france_albo <- cbind(france_albo,communes_abundance)
+plot(france_albo, lwd = 0.2)
+
+
+departements <- st_read("data/admin_data/departements-20180101-shp/departements-20180101.shp") %>% dplyr::filter(!(code_insee %in% c("974","976","972","973","971")))
+departements_abundance <- exact_extract(r_stack, departements, 'mean')
+departements_albo <- cbind(departements,departements_abundance)
+plot(departements_albo["mean.2025.06.08"], lwd = 0.3)
+
+
+
+ab_communes <- france_albo %>%
+  pivot_longer(cols = starts_with("mean"),names_to = "date",values_to = "abundance") %>%
+  mutate(date = gsub("\\.","-",date)) %>%
+  mutate(date = gsub("mean-","",date)) %>%
+  dplyr::select(commune, date, abundance, geometry) %>%
+  mutate(date = as.Date(date))
+
+ab_departements_albo <- departements_albo %>%
+  pivot_longer(cols = starts_with("mean"),names_to = "date",values_to = "abundance") %>%
+  mutate(date = gsub("\\.","-",date)) %>%
+  mutate(date = gsub("mean-","",date)) %>%
+  dplyr::select(nom, date, abundance, geometry) %>%
+  filter(!is.nan(abundance)) %>%
+  mutate(date = as.Date(date))
+
+
+st_write(ab_communes,"aedes_abundance_communes.gpkg")
+st_write(ab_departements_albo,"aedes_abundance_departements.gpkg", append = FALSE)
+
+
+library(RSQLite)
+a <- dbConnect(RSQLite::SQLite(),"aedes_abundance_departements.gpkg")
+dbSendQuery(a,"VACUUM")
+dbDisconnect(a)
+
+
+
+## sorties Arbocarto
+load("/home/ptaconet/Téléchargements/2025-06-05_arbocartoR_rawresults.rda")
+iris <- st_read("/home/ptaconet/Téléchargements/georef-herault-iris.geojson") %>% dplyr::select(code_officiel_iris,nom_officiel_iris)
+
+a <- trajectories[[1]] %>%
+  mutate(ID = as.numeric(ID)) %>%
+  data.frame() %>%
+  left_join(iris, by = c("ID"="code_officiel_iris")) %>%
+  st_as_sf() %>%
+  mutate(DATE = as.Date(DATE))
+
+  a <- a %>%
+    mutate(DATE = gsub("2021","2024",DATE)) %>%
+    mutate(DATE = as.Date(DATE)) %>%
+    filter(DATE %in% unique(b$date))
+
+st_write(a,"aedes_abundance_iris.gpkg", append = F)
+a <- dbConnect(RSQLite::SQLite(),"aedes_abundance_iris.gpkg")
+dbSendQuery(a,"VACUUM")
+dbDisconnect(a)
 
 
 ## Via API meteo france

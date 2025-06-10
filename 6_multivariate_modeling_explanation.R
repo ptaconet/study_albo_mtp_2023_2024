@@ -122,7 +122,7 @@ df_model_abundance <- df_model %>%
   #predictors_abundance <- c(predictors_abundance,"site")
 
 #### First step: to parameter the model: leave-one-site-out cross validation
-cv_col <- "Year"
+cv_col <- "site"
 
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
@@ -164,7 +164,7 @@ saveRDS(res_multiv_model_presence_nowcasting,"res_multiv_model_presence_nowcasti
 
 df_model_abundance$NB_ALBO_TOT <- log(df_model_abundance$NB_ALBO_TOT)
 
-cv_col <- "Year"
+cv_col <- "site"
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance, spacevar = cv_col,k = length(unique(unlist(df_model_abundance[,cv_col]))))
@@ -188,9 +188,17 @@ tr = trainControl(method="cv", ## repeatedcv
                   #search = "random"
                   )
 
+tr2 <- trainControl(
+  method = "cv",
+  index = indices_cv$index,
+  indexOut = indices_cv$indexOut,
+  savePredictions = 'final'
+)
+
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE
 mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"), importance = "permutation")
+#mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE",  preProcess = c("center","scale"), importance = "permutation")
 
 #### Last step: to put predictions on same data frame
 df_model_abundance$rowIndex <- seq(1,nrow(df_model_abundance),1)

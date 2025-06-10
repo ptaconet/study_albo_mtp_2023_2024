@@ -12,10 +12,10 @@ df_model <- read.csv(file.path("data","processed","df_to_model.csv"))
 
 # grouper à l'échelle de la ville-semaine de collecte :
 df_model <- df_model %>%
-  relocate(effectif_jour,.before = RR_0_0) %>%
-  group_by(site, Year,week) %>%
-  summarise_at(vars(effectif_jour:RFNO), mean, na.rm = TRUE) %>%
-  ungroup()
+  dplyr::relocate(effectif_jour,.before = RR_0_0) %>%
+  dplyr::group_by(site, Year,week) %>%
+  dplyr::summarise_at(vars(effectif_jour:RFNO), mean, na.rm = TRUE) %>%
+  dplyr::ungroup()
 
 
 df_model <- df_model %>%
@@ -35,7 +35,7 @@ df_model <- df_model %>%
 
 
 ##### First step: to select variables for presence models
-predictors_presence <- c("TM_3_8","TN_3_8","TX_3_8","UM_5_11","RR_7_8","FFM_3_8")
+predictors_presence <- c("TM_0_8","TN_0_7","TX_0_9","UM_5_11","RR_7_8","DRR_0_8","FFM_0_1")
 
 #### Final data frame for the multivariate analysis
 df_model_presence <- df_model %>%
@@ -51,7 +51,7 @@ df_model_presence <- df_model %>%
 ###########################
 
 ##### First step: select variables for abundance models
-predictors_abundance <- c("TM_3_8","TN_3_8","TX_3_8","UM_3_8","RR_3_8","FFM_3_8")
+predictors_abundance <- c("TM_0_4","TN_0_5","TX_0_4","UM_0_11","RR_1_5","DRR_0_4","FFM_0_1")
 
 #### Final data frame for the multivariate analysis
 df_model_abundance <- df_model %>%
@@ -64,7 +64,7 @@ df_model_abundance$NB_ALBO_TOT <- log(df_model_abundance$NB_ALBO_TOT)
 ## leave location out
 
 #### First step: to parameter the model: leave-one-site-out cross validation
-cv_col <- "Year"
+cv_col <- "site"
 
 #### Second step: It will train the model on data from all traps except one location, recursively on all locations. At the end: a table with predicted data for all traps (predicted with data)
 
@@ -124,9 +124,16 @@ tr = trainControl(method="cv",
                   #search = "random"
 )
 
+tr2 <- trainControl(
+  method = "cv",
+  index = indices_cv$index,
+  indexOut = indices_cv$indexOut,
+  savePredictions = 'final'
+)
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE
-mod_abundance <- CAST::ffs(predictors = df_model_abundance[,predictors_abundance], response = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"))
+#mod_abundance <- CAST::ffs(predictors = df_model_abundance[,predictors_abundance], response = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"))
+mod_abundance <- CAST::ffs(predictors = df_model_abundance[,predictors_abundance], response = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr2, metric = "MAE", preProcess = c("center","scale"))
 
 #### Last step: to put predictions on same data frame
 df_model_abundance$rowIndex <- seq(1,nrow(df_model_abundance),1)
