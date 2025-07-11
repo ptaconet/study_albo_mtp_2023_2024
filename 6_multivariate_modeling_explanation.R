@@ -156,7 +156,7 @@ df_cv_presence <- mod_presence$pred %>%
   dplyr::rename(pred_final = pred, pred = Presence)
 
 res_multiv_model_presence_nowcasting <- list(model = mod_presence, df_cv = df_cv_presence, df_mod = df_model_presence) ## to save models, data frame of the model and predictions
-saveRDS(res_multiv_model_presence_nowcasting,"res_multiv_model_presence_nowcasting.rds")
+saveRDS(res_multiv_model_presence_nowcasting,"res_multiv_model_presence_nowcasting2.rds")
 
 ##############
 #####" abundance
@@ -207,7 +207,7 @@ df_cv_abundance <- mod_abundance$pred %>%
   dplyr::select(pred,obs,site,week,Year)
 
 res_multiv_model_abundance_nowcasting <- list(model = mod_abundance, df_cv = df_cv_abundance, df_mod = df_model_abundance) ## to save models, data frame of the model and predictions
-saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcasting.rds")
+saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcasting2.rds")
 #saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcasting_tmax.rds")
 
 

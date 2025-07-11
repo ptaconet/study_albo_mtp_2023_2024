@@ -12,8 +12,7 @@ df_sf <- st_as_sf(df, coords = c("Longitude", "Latitude"), crs = 4326)
 
 wfs_ign <- "https://data.geopf.fr/wfs"
 
-ign_client <- WFSClient$new(wfs_ign,
-                            serviceVersion = "2.0.0")
+ign_client <- WFSClient$new(wfs_ign, serviceVersion = "2.0.0")
 
 # liste des couches disponibles :
 ign_client$getFeatureTypes(pretty = TRUE)  # voir aussi ici : https://geoservices.ign.fr/services-geoplateforme-diffusion#nomstechniques          https://geoservices.ign.fr/services-web-experts-economie
@@ -33,7 +32,7 @@ couches_interet <- c("BDTOPO_V3:batiment","BDTOPO_V3:cours_d_eau","BDTOPO_V3:pla
 
 url <- parse_url(wfs_ign)
 url$query <- list(service = "wfs",
-                  #version = "2.0.0", # optional
+                  version = "2.0.0", # optional
                   request = "GetFeature",
                   typename = couches_interet[1],
                   srsName = "EPSG:4326",

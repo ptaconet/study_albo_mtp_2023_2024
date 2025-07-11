@@ -60,8 +60,8 @@ meteo2 <- df_meteofrance %>% filter(nom_commune=="PEROLS") %>% mutate(nom_commun
 
 df_meteofrance = bind_rows(df_meteofrance,meteo2)
 
-df_meteofrance_2022_2024 <- df_meteofrance %>% filter(date>="2022-01-01", date <= "2025-01-01")
-write.csv(df_meteofrance_2022_2024,file.path("data","processed","data_meteofrance_2022_2024.csv"), row.names = F)
+df_meteofrance_2022_2025 <- df_meteofrance %>% filter(date>="2022-01-01", date <= today())
+write.csv(df_meteofrance_2022_2025,file.path("data","processed","data_meteofrance_2022_2025.csv"), row.names = F)
 
 df_meteofrance_historique <- df_meteofrance %>% filter(date<"2022-01-01")
 write.csv(df_meteofrance_historique,file.path("data","processed","data_meteofrance_historique.csv"), row.names = F)

@@ -1,22 +1,23 @@
 library(terra)
 library(tidyverse)
+library(sf)
+
+safran <- st_read("data/raw/climate_change/grille_safran_elab/SafranDomain.shp")
 
 
+scenario_year <- "baseline_1996_2005"
 
-scenario_year <- "85_2050_2059"
-
-
-
-nc_hum <- paste0("data/raw/climate_change/scenario",scenario_year,"/huss.nc")
-nc_temp <- paste0("data/raw/climate_change/scenario",scenario_year,"/tas.nc")
-nc_rr <- paste0("data/raw/climate_change/scenario",scenario_year,"/prtot.nc")
+nc_hum <- paste0("data/raw/climate_change/",scenario_year,"/huss.nc")
+nc_temp <- paste0("data/raw/climate_change/",scenario_year,"/tas.nc")
+nc_rr <- paste0("data/raw/climate_change/",scenario_year,"/prtot.nc")
 
 
 fun_create_df_from_nc_drias <- function(path_to_nc_drias, var, start_week_offset, end_week_offset, fun_to_apply, path_to_nc_temp = NULL){
 
   r <- rast(path_to_nc_drias)
+  crs(r)  <- "epsg:4326"
   r <- terra::flip(r,"vertical")
-  ext(r) <- c(-1.83808,9.89639,41.3183,45.9452)
+  ext(r) <- ext(safran)
 
   if(var == 'precipitation'){
     r = r*86400 # conversion from kg/m2/s to mm
@@ -27,7 +28,7 @@ fun_create_df_from_nc_drias <- function(path_to_nc_drias, var, start_week_offset
   if(var == "humidity"){
     r2 <- rast(path_to_nc_temp)
     r2 <- terra::flip(r2,"vertical")
-    ext(r2) <- c(-1.83808,9.89639,41.3183,45.9452)
+    ext(r2) <- c(-4.962154,9.573783,41.33729,51.04974)
     r2 <- r2-273.15
 
     p <- 1013  # pressure in hPa
@@ -63,7 +64,10 @@ fun_create_df_from_nc_drias <- function(path_to_nc_drias, var, start_week_offset
 
   n_weeks <- length(weeks)
 
+  pb <- txtProgressBar(min = 0, max = length(weeks), style = 3)
+
   for (i in seq_along(weeks)) {
+    #cat(i," ")
     # Calculate actual window indices relative to current week
     window_start <- i + start_week_offset
     window_end <- i + end_week_offset
@@ -95,13 +99,17 @@ fun_create_df_from_nc_drias <- function(path_to_nc_drias, var, start_week_offset
     weeks_iso <- gsub("-","-W",weeks[i])
     weeks_iso <- gsub("W00","W01",weeks_iso)
     weekly_dates[[length(weekly_dates) + 1]] <- as.Date(ISOweek::ISOweek2date(paste0(weeks_iso, "-1")))
+
+    setTxtProgressBar(pb, i)
   }
 
+  close(pb)
   # Combine results into a SpatRaster stack
   result_stack <- rast(weekly_means)
   names(result_stack) <- paste0("moving_window_mean_week_", seq_along(weekly_means))
   time(result_stack) <- do.call(c, weekly_dates)
 
+  result_stack <- crop(result_stack, vect(v))
 
   return(result_stack)
 
@@ -132,9 +140,8 @@ common_dates <- as.Date(common_dates)
 preds_presence <- list()
 preds_abundance <- list()
 
+pb <- txtProgressBar(min = 0, max = length(common_dates), style = 3)
 for(i in 1:length(common_dates)){
-
-  cat(i, " ")
 
   # presence models
   t <- TM_0_8[[which(time(TM_0_8) == common_dates[i])]]
@@ -158,8 +165,10 @@ for(i in 1:length(common_dates)){
   time(pred_abundance) <- common_dates[i]
   preds_abundance[[i]] <- exp(pred_abundance)
 
+  setTxtProgressBar(pb, i)
 
 }
+close(pb)
 
 
 result_presence <- rast(preds_presence)
@@ -213,23 +222,28 @@ r_pres_abundance <- ifel(r_weekly_avg_pres >= 0.5, r_weekly_avg_abun, 0)
 # plot(r_weekly_avg, col=colors, breaks=breaks)
 
 
- library(tidyterra)
-ggplot() +
-  geom_spatraster(data = r_pres_abundance) +
-  facet_wrap(~lyr)+
-  scale_fill_gradientn(
-    colours = c("blue", "white", "red"),  # 0 = blue, high = red
-    values = scales::rescale(c(0, 0.001, 50)),
-    limits = c(0, 50),
-    oob = scales::squish
-  ) +
-  theme_minimal()
+#  library(tidyterra)
+# ggplot() +
+#   geom_spatraster(data = r_pres_abundance) +
+#   facet_wrap(~lyr)+
+#   scale_fill_gradientn(
+#     colours = c("blue", "white", "red"),  # 0 = blue, high = red
+#     values = scales::rescale(c(0, 0.001, 50)),
+#     limits = c(0, 50),
+#     oob = scales::squish
+#   ) +
+#   theme_minimal()
 
 
 # extract values
-vals_pres_abundance <- data.frame(values(r_pres_abundance))
+vals_pres_abundance2 <- as.data.frame(r_pres_abundance, xy = TRUE)
 
-data_long <- gather(vals_pres_abundance, factor_key=TRUE) %>%
+write.csv(vals_pres_abundance2,paste0("data/raw/climate_change/results/",scenario_year,"_all_coordinates.csv"), row.names = F)
+
+
+data_long <- vals_pres_abundance2 %>%
+  dplyr::select(-c("x","y")) %>%
+  gather(factor_key=TRUE) %>%
   group_by(key) %>%
   summarise(mean= mean(value, na.rm = T), sd= sd(value, na.rm = T), max = max(value, na.rm = T),min = min(value, na.rm = T)) %>%
   rename(week = key) %>%
@@ -237,7 +251,7 @@ data_long <- gather(vals_pres_abundance, factor_key=TRUE) %>%
   mutate(scenario = scenario_year)
 
 
-write.csv(data_long,paste0("data/raw/climate_change/results/scenario",scenario_year,"_all.csv"), row.names = F)
+write.csv(data_long,paste0("data/raw/climate_change/results/",scenario_year,"_all.csv"), row.names = F)
 
 
 # values by departement
@@ -255,18 +269,18 @@ all <- full_join(mean,sd) %>%
   rename(departement = nom) %>%
   mutate(scenario = scenario_year)
 
-write.csv(all,paste0("data/raw/climate_change/results/scenario",scenario_year,"_bydepartement.csv"), row.names = F)
+write.csv(all,paste0("data/raw/climate_change/results/",scenario_year,"_bydepartement.csv"), row.names = F)
 
 #ggplot(all, aes(x = week, y = mean)) + geom_line() + facet_wrap(.~departement)
 
 
 
 
- list.files(file.path("data","raw","climate_change","results"), full.names = T, pattern = "departement") %>%
-  purrr::map_dfr(.,~read.csv(.)) %>%
-  ggplot(aes(x = week, y = mean, group = scenario, colour = scenario)) + geom_line() + facet_wrap(.~departement)
-
-
- list.files(file.path("data","raw","climate_change","results"), full.names = T, pattern = "all") %>%
-  purrr::map_dfr(.,~read.csv(.)) %>%
-   ggplot(aes(x = week, y = mean, group = scenario, colour = scenario)) + geom_line()
+ # list.files(file.path("data","raw","climate_change","results"), full.names = T, pattern = "departement") %>%
+ #  purrr::map_dfr(.,~read.csv(.)) %>%
+ #  ggplot(aes(x = week, y = mean, group = scenario, colour = scenario)) + geom_line() + facet_wrap(.~departement)
+ #
+ #
+ # list.files(file.path("data","raw","climate_change","results"), full.names = T, pattern = "all") %>%
+ #  purrr::map_dfr(.,~read.csv(.)) %>%
+ #   ggplot(aes(x = week, y = mean, group = scenario, colour = scenario)) + geom_line()

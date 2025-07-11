@@ -1,7 +1,7 @@
 library(tidyverse)
 library(furrr)
 
- pieges_data <- read.csv( file.path("data","processed","df_pieges.csv")) %>%
+ pieges_data <- read.csv( file.path("data","processed","df_pieges_2022_2025.csv")) %>% #read.csv( file.path("data","processed","df_pieges.csv")) %>%
    filter(!is.na(date_releve)) %>%
    mutate(num_releve = seq(1,nrow(.),1)) %>%
    mutate(idpointdecapture = paste0(num_piege,"_",num_releve))
@@ -12,7 +12,7 @@ sites = unique(pieges_data$site)
 ### Variables météorologiques
 ### ### ### ### ### ### ### ###
 
-meteo <- read.csv(file.path("data","processed","data_meteofrance_2022_2024.csv")) %>%
+meteo <- read.csv(file.path("data","processed","data_meteofrance_2022_2025.csv")) %>%
   rename(site = nom_commune) %>%
   mutate(date = as.Date(date)) %>%
   mutate(TN_GDD = ifelse(TN>11, TN, 11),TX_GDD = case_when(TX<11~11, TX==11~11, TX==30~30, 11<TX & TX<30~TX, TX>30~30), GDDjour=(TX_GDD+TN_GDD)/2-11 ) %>%
@@ -244,4 +244,4 @@ photoperiod <- suncalc::getSunlightTimes( data = df_to_model_photo)
 df_to_model$photoperiod <- as.numeric(photoperiod$sunset-photoperiod$sunrise)
 
 
-write.csv(df_to_model,file.path("data","processed","df_to_model.csv"), row.names = F)
+write.csv(df_to_model,file.path("data","processed","df_to_model_2022_2025.csv"), row.names = F)

@@ -325,7 +325,7 @@ for(i in 1:length(variables_presence)){
     ylim(c(0,1)) +
     ylab("Presence probability") +
     xlab(paste(variables_presence[i],
-               case_when(grepl("TM|TX",variables_presence[i]) ~ "(°C)",
+               case_when(grepl("TM|TX|TN",variables_presence[i]) ~ "(°C)",
                          grepl("UM",variables_presence[i]) ~ "(%)",
                          grepl("RR",variables_presence[i]) ~ "(mm)"))) +
     theme(legend.position = "none",
@@ -387,7 +387,7 @@ for(i in 1:length(variables_abundance)){
     ylim(c(0,40)) +
     ylab("Abundance") +
     xlab(paste(variables_abundance[i],
-               case_when(grepl("TM|TX",variables_abundance[i]) ~ "(°C)",
+               case_when(grepl("TM|TX|TN",variables_abundance[i]) ~ "(°C)",
                          grepl("UM",variables_abundance[i]) ~ "(%)",
                          grepl("RR",variables_abundance[i]) ~ "(mm)"))) +
     theme(legend.position = "bottom",
@@ -511,7 +511,7 @@ library(lime)
 meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
   mutate(date=as.Date(date)) %>%
   mutate(week = week(date), Year = year(date)) %>%
-  dplyr::filter(date>=as.Date("2023-01-01"))
+  dplyr::filter(date>=as.Date("2023-01-01" & date < "2025-01-01"))
 
 
 
@@ -542,8 +542,8 @@ explanation_presence <- explain(
 )
 
 x_presence <- x_presence %>%
-  #slice(rep(1:n(), each = length(c(variables_presence,"site")))) %>%
-  slice(rep(1:n(), each = length(variables_presence))) %>%
+  slice(rep(1:n(), each = length(c(variables_presence,"site")))) %>%
+  #slice(rep(1:n(), each = length(variables_presence))) %>%
   dplyr::select(site, Year, week)
 
 explanation_presence <- explanation_presence %>%
@@ -569,8 +569,8 @@ explanation_abundance <- explain(
   feature_select = "highest_weights")
 
 x_abundance <- x_abundance %>%
-  #slice(rep(1:n(), each = length(c(variables_abundance,"site")))) %>%
-  slice(rep(1:n(), each = length(variables_abundance))) %>%
+  slice(rep(1:n(), each = length(c(variables_abundance,"site")))) %>%
+   #slice(rep(1:n(), each = length(variables_abundance))) %>%
   dplyr::select(site, Year, week)
 
 explanation_abundance <- explanation_abundance %>%

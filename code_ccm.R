@@ -2,7 +2,7 @@ library(tidyverse)
 library(furrr)
 library(patchwork)
 
-df_model <- read.csv(file.path("data","processed","df_to_model.csv"))
+df_model <- read.csv(file.path("data","processed","df_to_model_2022_2025.csv"))
 
 # grouper à l'échelle de la ville-semaine de collecte :
 df_model <- df_model %>%
@@ -23,6 +23,7 @@ df_model <-  df_model %>%
   relocate(presence_oeufs, .after = effectif_jour) %>%
   filter(!is.na(presence_oeufs))
 
+df_model <- df_model %>% filter(site %in% c( "MURVIEL-LES-MONTPELLIER", "PEROLS","BAYONNE", "SAINT-MEDARD-EN-JALLES"))
 
  df_model_allsites <- df_model %>%
    mutate(site = "TOUS SITES")
@@ -30,7 +31,6 @@ df_model <-  df_model %>%
   df_model <- bind_rows(df_model,df_model_allsites)
 
 df_model <- df_model %>%
-  filter(site!="RENNES") %>%
   mutate(environment = case_when(site %in% c( "MURVIEL-LES-MONTPELLIER", "PEROLS") ~ "MEDITERRANEAN",
                                    site %in% c( "BAYONNE", "SAINT-MEDARD-EN-JALLES") ~ "ATLANTIC"))
 

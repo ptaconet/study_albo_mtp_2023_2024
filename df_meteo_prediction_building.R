@@ -1,4 +1,4 @@
-meteo <- read.csv(file.path("data","processed","data_meteofrance_2022_2024.csv")) %>%
+meteo <- read.csv(file.path("data","processed","data_meteofrance_2022_2025.csv")) %>%
   rename(site = nom_commune) %>%
   mutate(date = as.Date(date)) %>%
   dplyr::select(site ,date,RR,TM,UM)

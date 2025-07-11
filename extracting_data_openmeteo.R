@@ -537,7 +537,7 @@ dbSendQuery(a,"VACUUM")
 dbDisconnect(a)
 
 
-## Via API meteo france
+## Via API meteo france  https://donneespubliques.meteofrance.fr/?fond=produit&id_produit=131&id_rubrique=51
 
 library(httr2)
 
@@ -563,3 +563,51 @@ writeBin(resp_body_raw(response), paste0("temperature_025",dates[i],".tif"))
 }
 
 
+# comparison with year 2025
+pieges_data <- read.csv(file.path("data","processed","pieges_data_2021_2025.csv")) %>%
+  mutate(date=as.Date(date_releve_jour, format = "%d/%m/%y")) %>%
+  mutate(effectif_jour = gsub(",",".",effectif_jour)) %>%
+  mutate(effectif_jour=as.numeric(effectif_jour)) %>%
+  filter(date>"2025-02-09") %>%
+  dplyr::select(nom_commune, date, Semaine_releve, effectif_jour ) %>%
+  rename(commune = nom_commune, observed = effectif_jour) %>%
+  group_by(commune, Semaine_releve) %>%
+  summarise(observed=mean(observed)) %>%
+  ungroup()
+
+ read.csv(file.path("data","processed","pieges_data_2021_2025.csv")) %>%
+  mutate(date=as.Date(date_releve_jour, format = "%d/%m/%y")) %>%
+  mutate(effectif_jour = gsub(",",".",effectif_jour)) %>%
+  mutate(effectif_jour=as.numeric(effectif_jour)) %>%
+  dplyr::select(nom_commune, date, Semaine_releve, effectif_jour,  annee) %>%
+  rename(commune = nom_commune, observed = effectif_jour) %>%
+   mutate(annee = as.factor(annee)) %>%
+  group_by(commune, Semaine_releve, annee) %>%
+  summarise(observed=mean(observed, na.rm = T)) %>%
+  ungroup() %>%
+  ggplot(aes(x=Semaine_releve, y = observed, group = annee, color = annee)) +
+  geom_line() +
+  facet_wrap(.~commune)
+
+
+
+ab_communes = ab_communes %>%
+  st_drop_geometry() %>%
+  filter(commune %in% c("Pérols","Saint-médard-en-jalles","Murviel-lès-Montpellier","Bayonne")) %>%
+  mutate(commune = case_when(commune == "Pérols"~"PEROLS",
+                             commune == "Saint-médard-en-jalles"~"SAINT-MEDARD-EN-JALLES",
+                             commune == "Murviel-lès-Montpellier"~"MURVIEL-LES-MONTPELLIER",
+                             commune == "Bayonne"~"BAYONNE")) %>%
+  mutate(Semaine_releve = lubridate::week(date)) %>%
+  rename(predicted = abundance) %>%
+  filter(Semaine_releve<=23)
+
+
+ ab_communes %>%
+  left_join(pieges_data, by = c("commune","Semaine_releve")) %>%
+  pivot_longer(c("predicted","observed")) %>%
+  filter(Semaine_releve<=23) %>%
+  ggplot(aes(x=Semaine_releve, y = value, group = name, color = name)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(.~commune)

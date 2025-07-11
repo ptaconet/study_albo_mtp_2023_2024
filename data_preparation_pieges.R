@@ -5,7 +5,18 @@ library(sf)
 # ## Import and prepare dataset of mosquito collection
 
 # Data altopictus
-df <- read.csv("piege_data.csv") %>%
+# df <- read.csv("piege_data.csv") %>%
+#   filter(!is.na(date_releve_jour),!is.na(effectif_jour), statut == "RAS") %>%
+#   mutate(daterec = as.Date(parse_date_time(date_releve_jour,"d/m/y"))) %>%
+#   rename(Latitude = y, Longitude = x, Site = nom_commune, NumPP = num_piege) %>%
+#   mutate(week = week(daterec), Mois_numeric = month(daterec), Year = year(daterec)) %>%
+#   mutate(Latitude = gsub(",",".",Latitude), Longitude = gsub(",",".",Longitude), effectif_jour = gsub(",",".",effectif_jour)) %>%
+#   mutate(effectif_jour = as.numeric(effectif_jour), Latitude = as.numeric(Latitude),  Longitude = as.numeric(Longitude)) %>%
+#   filter(!is.na(effectif_jour)) %>%
+#   filter(Year %in% c(2023,2024)) %>%
+#   dplyr::select(daterec, week, Year, Mois_numeric, NumPP, Latitude, Longitude, Site, effectif_jour)
+
+df <- read.csv("pieges_data_2021_2025.csv") %>%
   filter(!is.na(date_releve_jour),!is.na(effectif_jour), statut == "RAS") %>%
   mutate(daterec = as.Date(parse_date_time(date_releve_jour,"d/m/y"))) %>%
   rename(Latitude = y, Longitude = x, Site = nom_commune, NumPP = num_piege) %>%
@@ -13,7 +24,7 @@ df <- read.csv("piege_data.csv") %>%
   mutate(Latitude = gsub(",",".",Latitude), Longitude = gsub(",",".",Longitude), effectif_jour = gsub(",",".",effectif_jour)) %>%
   mutate(effectif_jour = as.numeric(effectif_jour), Latitude = as.numeric(Latitude),  Longitude = as.numeric(Longitude)) %>%
   filter(!is.na(effectif_jour)) %>%
-  filter(Year %in% c(2023,2024)) %>%
+  filter(Year %in% c(2023,2024,2025)) %>%
   dplyr::select(daterec, week, Year, Mois_numeric, NumPP, Latitude, Longitude, Site, effectif_jour)
 
 # Data Colombine
@@ -41,7 +52,7 @@ df_pieges <- df %>%
   rename(num_piege = NumPP, date_releve = daterec, site = Site) %>%
   mutate(Mois = as.character(lubridate::month(date_releve, label = TRUE))) %>%
   mutate(Mois =  fct_relevel(Mois, c("janv","févr","mars","avril","mai","juin","juil","août","sept","oct","nov","déc"))) %>%
-  mutate(Year = factor(Year, levels = c("2023", "2024"))) %>%
+  mutate(Year = factor(Year, levels = c("2023", "2024","2025"))) %>%
   mutate(saison = ifelse(Mois %in% c("mai","juin","juil","août","sept"), 'Summer','Winter')) %>%
   mutate(saison = fct_relevel(saison, c("Winter","Summer"))) %>%
   mutate(date_year = as.Date(paste0(Year,"-01-01"))) %>%
@@ -50,4 +61,4 @@ df_pieges <- df %>%
 # for this analysis we remove Montpellier
 df_pieges <- df_pieges %>% filter(!(site == "MONTPELLIER"))
 
-write.csv(df_pieges, file.path("data","processed","df_pieges.csv"), row.names = F)
+write.csv(df_pieges, file.path("data","processed","df_pieges_2022_2025.csv"), row.names = F)
