@@ -100,6 +100,7 @@ corr_univ_presence <- df_model %>%
 # abundance
 corr_univ_abundance <- df_model %>%
   filter(effectif_jour>0) %>%
+  #filter(week>27 & week <41) %>%  # entre juillet et octobre
   group_split(site) %>%
   map_dfr(.,~fun_compute_correlation_univ(., "abundance", "distance")) %>%
   as.tibble() %>%
@@ -157,7 +158,7 @@ fun_ccm_plot2 <- function(correlation_df, var, metric_name, indicator){
       scale_fill_gradient2(low = "white", high = "red", limit = c(0,1), space = "Lab", name = "Distance correlation", na.value = "grey")
   } else if(metric_name=="spearman"){
     ccm_plot <- ccm_plot +
-      scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-.8,.8), space = "Lab", name = "Spearman correlation", na.value = "grey")
+      scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1,1), space = "Lab", name = "Spearman correlation", na.value = "grey")
   }
 
   return(ccm_plot)
@@ -196,7 +197,7 @@ plots_univ_spearman_temporal_mf <- univ_spearman_temporal_mf %>%
   #arrange(rev(indicator),factor(var, levels = c("TM","TN","TX","TAMPLI","GDDjour","GDDacc","GDDbound","UM","RR","RRMAX","DRR","FFM","FXY")),factor(environment, levels = c("MEDITERRANEAN","ATLANTIC"))) %>%
   dplyr::filter(!var %in% c("GDDjour","GDDacc","GDDbound","TAMPLI")) %>%
   #dplyr::filter(!var %in% c("GDDjour","GDDacc","GDDbound","TAMPLI","FXY","DRR","RRMAX")) %>%
-  mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1], metric_name = "distance", ..2))) %>%
+  mutate(univ_temporal = pmap(list(data,indicator), ~fun_ccm_plot2(correlation_df = ..1, var = ..1$label[1], metric_name = "spearman", ..2))) %>%
   nest(-c(site,indicator)) %>%
   mutate(univ_temporal = map(data, ~patchwork::wrap_plots(.x$univ_temporal, nrow = 1, ncol = 9))) %>%
   mutate(univ_temporal = pmap(list(univ_temporal,site), ~..1 + patchwork::plot_annotation(title = ..2))) %>%

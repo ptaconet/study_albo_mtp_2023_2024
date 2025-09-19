@@ -1,7 +1,67 @@
-meteo <- read.csv(file.path("data","processed","data_meteofrance_2022_2025.csv")) %>%
-  rename(site = nom_commune) %>%
-  mutate(date = as.Date(date)) %>%
-  dplyr::select(site ,date,RR,TM,UM)
+# meteo <- read.csv(file.path("data","processed","data_meteofrance_2022_2025.csv")) %>%
+#   rename(site = nom_commune) %>%
+#   mutate(date = as.Date(date)) %>%
+#   dplyr::select(site ,date,RR,TM,UM)
+
+meteo_perols <- openmeteo::weather_history(
+  location = c("PEROLS"),
+  daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
+  model = "meteofrance_arome_france_hd",
+  start = as.Date("2024-09-01"),
+  end = today())
+
+# meteo_bayonne <- openmeteo::weather_history(
+#   location = c("BAYONNE"),
+#   daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
+#   model = "meteofrance_arome_france_hd",
+#   start = as.Date("2024-09-01"),
+#   end = today())
+#
+# meteo_stmedard <- openmeteo::weather_history(
+#   location = c("SAINT-MEDARD-EN-JALLES"),
+#   daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
+#   model = "meteofrance_arome_france_hd",
+#   start = as.Date("2024-09-01"),
+#   end = today())
+#
+# meteo_murviel <- openmeteo::weather_history(
+#   location = c("MURVIEL-LES-MONTPELLIER"),
+#   daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
+#   model = "meteofrance_arome_france_hd",
+#   start = as.Date("2024-09-01"),
+#   end = today())
+
+meteo_muret <- openmeteo::weather_history(
+  location = c("MURET"),
+  daily = c("temperature_2m_mean","relative_humidity_2m_mean","precipitation_sum"),
+  model = "meteofrance_arome_france_hd",
+  start = as.Date("2024-09-01"),
+  end = today())
+
+
+meteo_perols <- meteo_perols %>%
+  mutate(site="PEROLS") %>%
+  rename(TM = daily_temperature_2m_mean, UM = daily_relative_humidity_2m_mean, RR = daily_precipitation_sum)
+#
+# meteo_bayonne <- meteo_bayonne %>%
+#   mutate(site="BAYONNE") %>%
+#   rename(TM = daily_temperature_2m_mean, UM = daily_relative_humidity_2m_mean, RR = daily_precipitation_sum)
+#
+# meteo_stmedard <- meteo_stmedard %>%
+#   mutate(site="SAINT-MEDARD-EN-JALLES") %>%
+#   rename(TM = daily_temperature_2m_mean, UM = daily_relative_humidity_2m_mean, RR = daily_precipitation_sum)
+#
+# meteo_murviel <- meteo_murviel %>%
+#   mutate(site="MURVIEL-LES-MONTPELLIER") %>%
+#   rename(TM = daily_temperature_2m_mean, UM = daily_relative_humidity_2m_mean, RR = daily_precipitation_sum)
+
+meteo_muret <- meteo_muret %>%
+  mutate(site="MURET") %>%
+  rename(TM = daily_temperature_2m_mean, UM = daily_relative_humidity_2m_mean, RR = daily_precipitation_sum)
+
+#meteo <- rbind(meteo_perols, meteo_bayonne, meteo_stmedard, meteo_murviel, meteo_muret)
+meteo <- rbind(meteo_perols, meteo_muret)
+
 
 lag_max <- 84
 
@@ -136,8 +196,8 @@ df_meteo_pieges_summ_wide_meteofrance <- df_meteo_pieges_summ_wide1 %>%
 
 
 df_meteo_predictions <- df_meteo_pieges_summ_wide_meteofrance %>%
-  dplyr::select(site,th_date,TM_0_8,UM_5_11,TM_0_4, UM_0_11,RR_1_5) %>%
+  dplyr::select(site,th_date,TM_0_8,UM_5_11,TM_0_4, UM_0_11,RR_1_5, TM_0_3,UM_2_2,RR_3_3) %>%
   rename(date=th_date)
 
 
-write.csv(df_meteo_predictions,file.path("data","processed","df_meteo_predictions.csv"), row.names = F)
+write.csv(df_meteo_predictions,file.path("data","processed","df_meteo_predictions_2025.csv"), row.names = F)

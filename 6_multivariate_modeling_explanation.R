@@ -105,13 +105,35 @@ p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_
 ## Final variables selections
 predictors_abundance <- c("TM_0_4","UM_0_11","RR_1_5")
 
-
 #### Final data frame for the multivariate analysis
 df_model_abundance <- df_model %>%
   filter(NB_ALBO_TOT>0) %>%
   dplyr::select("site","Year", "week" ,  "NB_ALBO_TOT", "PRES_ALBO", predictors_abundance)
 
 
+## adding sin of day of year
+DOY <- df_model %>%
+  filter(NB_ALBO_TOT>0) %>%
+  mutate(doy = lubridate::yday(as.Date(
+    paste(Year, week, 1),
+    format = "%Y %U %u"))) %>%
+  #mutate(sin_doy = sin(2 * pi * doy / 365), cos_doy = cos(2 * pi * doy / 365))
+  mutate(sin_doy = sin(doy), cos_doy = cos( doy))
+
+df_model_abundance$sin_doy = DOY$sin_doy
+df_model_abundance$cos_doy = DOY$cos_doy
+
+#
+# df_model_abundance <- df_model_abundance %>%
+#   arrange(site, Year, week) %>%
+#   group_by(site) %>%
+#   mutate(NB_ALBO_TOT_prev = log(dplyr::lag(zoo::na.locf(NB_ALBO_TOT, na.rm = FALSE), order_by = week))) %>%
+#   ungroup() %>%
+#   filter(!is.na(NB_ALBO_TOT_prev))
+
+predictors_abundance <- c("TM_0_4","UM_0_11","RR_1_5","cos_doy", "week")
+
+df_weigths <- ifelse( df_model_abundance$NB_ALBO_TOT >30, 100, 1 )
 
 ###########################
 #########'Second stage of analysis: multivariate anaylsis using a leave-one-site-out cross validation and a leave-one-session-out cross validation (but juste to valdiate and evaluate the model)
@@ -196,9 +218,9 @@ tr2 <- trainControl(
 )
 
 
-#### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE
+#### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE  #### methods working more or less = "svmPoly"
 mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"), importance = "permutation")
-#mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "MAE",  preProcess = c("center","scale"), importance = "permutation")
+#mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "svmPoly", tuneLength = 4, trControl = tr2, metric = "MAE",  preProcess = c("center","scale"), importance = "permutation")
 
 #### Last step: to put predictions on same data frame
 df_model_abundance$rowIndex <- seq(1,nrow(df_model_abundance),1)

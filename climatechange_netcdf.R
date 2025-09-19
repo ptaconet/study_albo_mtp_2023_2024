@@ -2,22 +2,24 @@ library(terra)
 library(tidyverse)
 library(sf)
 
-safran <- st_read("data/raw/climate_change/grille_safran_elab/SafranDomain.shp")
+#safran <- st_read("data/raw/climate_change/grille_safran_elab/SafranDomain.shp") %>% st_transform(2154)
 
+safran_csv <- read.csv("data/raw/climate_change/grille_safran_elab/grilleSafran_utile_drias2021.csv", sep = ";")
 
-scenario_year <- "baseline_1996_2005"
+scenario_year <- "scenario85_2046_2065"
 
-nc_hum <- paste0("data/raw/climate_change/",scenario_year,"/huss.nc")
-nc_temp <- paste0("data/raw/climate_change/",scenario_year,"/tas.nc")
-nc_rr <- paste0("data/raw/climate_change/",scenario_year,"/prtot.nc")
+nc_hum <- list.files( paste0("data/raw/climate_change/",scenario_year), pattern = "huss", full.names = T)
+nc_temp <- list.files( paste0("data/raw/climate_change/",scenario_year), pattern = "tas", full.names = T)
+nc_rr <- list.files( paste0("data/raw/climate_change/",scenario_year), pattern = "prtot", full.names = T)
 
 
 fun_create_df_from_nc_drias <- function(path_to_nc_drias, var, start_week_offset, end_week_offset, fun_to_apply, path_to_nc_temp = NULL){
 
   r <- rast(path_to_nc_drias)
-  crs(r)  <- "epsg:4326"
   r <- terra::flip(r,"vertical")
-  ext(r) <- ext(safran)
+  crs(r) <- "epsg:27582"
+  ext(r) <- c(min(safran_csv$E.lambert2et.m.)-4000,max(safran_csv$E.lambert2et.m.)+4000,min(safran_csv$N.lambert2et.m.)-4000,max(safran_csv$N.lambert2et.m.)+12000)  # c(56000,1200000, 1613000, 2685000)
+
 
   if(var == 'precipitation'){
     r = r*86400 # conversion from kg/m2/s to mm
@@ -28,7 +30,9 @@ fun_create_df_from_nc_drias <- function(path_to_nc_drias, var, start_week_offset
   if(var == "humidity"){
     r2 <- rast(path_to_nc_temp)
     r2 <- terra::flip(r2,"vertical")
-    ext(r2) <- c(-4.962154,9.573783,41.33729,51.04974)
+    crs(r2) <- "epsg:27582"
+    ext(r2) <- c(min(safran_csv$E.lambert2et.m.)-4000,max(safran_csv$E.lambert2et.m.)+4000,min(safran_csv$N.lambert2et.m.)-4000,max(safran_csv$N.lambert2et.m.)+12000)  # c(56000,1200000, 1613000, 2685000)
+
     r2 <- r2-273.15
 
     p <- 1013  # pressure in hPa
@@ -109,7 +113,7 @@ fun_create_df_from_nc_drias <- function(path_to_nc_drias, var, start_week_offset
   names(result_stack) <- paste0("moving_window_mean_week_", seq_along(weekly_means))
   time(result_stack) <- do.call(c, weekly_dates)
 
-  result_stack <- crop(result_stack, vect(v))
+  #result_stack <- crop(result_stack, vect(v))
 
   return(result_stack)
 

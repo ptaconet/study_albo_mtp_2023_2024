@@ -4,14 +4,16 @@ library(tidyverse) ## Version ‘2.0.0’
 library(iml) ## Version '0.11.3'
 library(patchwork) ## Version ‘1.2.0.9000’
 library(precrec) ## Version ‘0.14.4’
+library(forcats)
+library(dplyr)
 
 ########################### Open dataset containing the results of presence and abundance models
 
 multiv_model_presence_explanatory <- readRDS("res_multiv_model_presence_explanatory.rds")
 multiv_model_abundance_explanatory <- readRDS("res_multiv_model_abundance_explanatory.rds")
 
-multiv_model_presence_nowcasting <- readRDS("res_multiv_model_presence_nowcasting.rds")
-multiv_model_abundance_nowcasting <- readRDS("res_multiv_model_abundance_nowcasting.rds")
+multiv_model_presence_nowcasting <- readRDS("res_multiv_model_presence_nowcasting2.rds")
+multiv_model_abundance_nowcasting <- readRDS("res_multiv_model_abundance_nowcasting2.rds")
 
 multiv_model_presence_forecasting <- readRDS("res_multiv_model_presence_forecasting_llo.rds")
 multiv_model_abundance_forecasting <- readRDS("res_multiv_model_abundance_forecasting_llo.rds")
@@ -97,31 +99,31 @@ df <- df_cv_andrea %>%
 
 df %>%
   dplyr::select(-pred_stat_forecasting) %>%
-  add_row(site = "BAYONNE", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA) %>%
-  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_arbocarto = NA, pred_stat_nowcasting = NA) %>%
+  dplyr::select(-pred_arbocarto) %>%
+  add_row(site = "BAYONNE", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_stat_nowcasting = NA) %>%
+  add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, obs = NA, pred_metelmann = NA, pred_stat_nowcasting = NA) %>%
   rename(obs_mathematical = obs) %>%
   mutate(obs_statistical = obs_mathematical) %>%
   group_by(site) %>%
-  mutate_at(c("obs_mathematical","pred_metelmann", "pred_arbocarto"), funs(c(scales::rescale(., to = c(0, 1))))) %>%
+  mutate_at(c("obs_mathematical","pred_metelmann"), funs(c(scales::rescale(., to = c(0, 1))))) %>%
   ungroup() %>%
   pivot_longer(-c('site', 'Year', 'week')) %>%
   mutate(date = as.Date(paste(Year, week, 1, sep = "-"), "%Y-%U-%u")) %>%
   mutate(model = case_when(
-    name %in% c("obs_mathematical","pred_metelmann", "pred_arbocarto") ~ 'Mathematical models',
+    name %in% c("obs_mathematical","pred_metelmann") ~ 'Mechanistic\nmodel',
     #name %in% c("obs_statistical", "pred_stat_nowcasting","pred_stat_forecasting") ~ 'Statistical models'  )) %>%
-    name %in% c("obs_statistical", "pred_stat_nowcasting") ~ 'Machine learning model'  )) %>%
-  mutate(model = fct_relevel(model, c('Mathematical models','Machine learning model'))) %>%
+    name %in% c("obs_statistical", "pred_stat_nowcasting") ~ 'Statistic\nmodel'  )) %>%
+  mutate(model = fct_relevel(model, c('Mechanistic\nmodel','Statistic\nmodel'))) %>%
   # Duplicate "obs" so it appears in both "mathematical" and "statistical" facets
   mutate(site = fct_relevel(site, c( "PEROLS", "MURVIEL-LES-MONTPELLIER",  "BAYONNE","SAINT-MEDARD-EN-JALLES" , "RENNES" ))) %>%
   ggplot(aes(x = date, y = value, color = name, group = name, size = ifelse(name %in% c("obs_mathematical","obs_statistical"), 0.6, 0.5))) +
-  geom_line() +
-  geom_point(size = 0.4) +
+  geom_line(size = 0.7) +
+  geom_point(size = 0.7) +
   #ggh4x::facet_grid2(cols = vars(model), rows = vars(site), scales = "free_y", independent = "y") +
   facet_grid(cols = vars(site), rows = vars(model), scales = "free_y") +
  scale_color_manual(values = c(
     "obs_mathematical" = "#49423c",  # Observed values in black
     "obs_statistical" = "#49423c",  # Observed values in black
-    "pred_arbocarto" = "#6a994e",  # Similar blue for Arbocarto
     "pred_metelmann" = "#a7c957",  # Slightly different but close blue for Metelman
     #"pred_stat_explanatory" = "#E69F00",
     "pred_stat_nowcasting" = "#457b9d",
@@ -134,24 +136,27 @@ df %>%
   labels = c(
     "obs_mathematical" = "Observations",
     "obs_statistical" = "",
-    "pred_arbocarto" = "Arbocarto predictions",
-    "pred_metelmann" = "Metelmann predictions",
+    "pred_metelmann" = "Mechanistic model predictions",
     #"pred_stat_explanatory" = "ML explanatory",
-    "pred_stat_nowcasting" = "ML predictions",
+    "pred_stat_nowcasting" = "Statistic model predictions",
     "pred_stat_forecasting" = "ML forecasting"))+
   scale_size_identity() +
-  ylab("Egg abundance") +
+  ylab("Oviposition abundance") +
   labs(color = 'Model') +
   theme(
     legend.position = "bottom",
     legend.title = element_blank(),
+    legend.text=element_text(size=11),
     panel.background = element_blank(),
     axis.line = element_line(colour = "grey"),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 10),
     axis.title.x=element_blank(),
+    axis.title.y=element_text(size = 12),
     axis.text.y=element_blank(),
     axis.ticks.x=element_line(colour = "grey"),
-    axis.ticks.y=element_line(colour = "grey")
+    axis.ticks.y=element_line(colour = "grey"),
+    strip.text.x = element_text(size = 10),
+    strip.text.y = element_text(size = 11)
     #text = element_text(family = "Georgia")
   )
 
@@ -170,20 +175,26 @@ df %>%
 
 
 
-## obs vs pred values
-df %>%
-  mutate(site = fct_relevel(site,c( "PEROLS", "MURVIEL-LES-MONTPELLIER", "BAYONNE", "SAINT-MEDARD-EN-JALLES" ))) %>%
-  group_by(site) %>%
-  summarise(spearman_metelmann = round(cor(obs, pred_metelmann, method="spearman", use = "complete.obs"),2),
-            spearman_arbocarto = round(cor(obs, pred_arbocarto, method="spearman", use = "complete.obs"),2),
-            spearman_ML_nowcasting = round(cor(obs, pred_stat_nowcasting, method="spearman", use = "complete.obs"),2),
-            spearman_ML_forecasting = round(cor(obs, pred_stat_forecasting, method="spearman", use = "complete.obs"),2),
-            pearson_metelmann = round(cor(obs, pred_metelmann, method="pearson", use = "complete.obs"),2),
-            pearson_arbocarto = round(cor(obs, pred_arbocarto, method="pearson", use = "complete.obs"),2),
-            pearson_ML_nowcasting = round(cor(obs, pred_stat_nowcasting, method="pearson", use = "complete.obs"),2),
-            pearson_ML_forecasting = round(cor(obs, pred_stat_forecasting, method="pearson", use = "complete.obs"),2)
-            )
 
+
+# helper function to extract correlation + p-value
+get_cor <- function(x, y, method){
+  ct <- suppressWarnings(cor.test(x, y, method = method, use = "complete.obs"))
+  tibble(cor = round(unname(ct$estimate),2), pval = ct$p.value)
+}
+
+df_stats <- df %>%
+  mutate(site = fct_relevel(site, c("PEROLS", "MURVIEL-LES-MONTPELLIER",
+                                    "BAYONNE", "SAINT-MEDARD-EN-JALLES"))) %>%
+  group_by(site) %>%
+  summarise(
+    # Spearman
+    get_cor(obs, pred_metelmann, "spearman") %>% rename_with(~paste0("spearman_metelmann_", .)),
+    get_cor(obs, pred_stat_nowcasting, "spearman") %>% rename_with(~paste0("spearman_nowcasting_", .)),
+    # Pearson
+    get_cor(obs, pred_metelmann, "pearson") %>% rename_with(~paste0("pearson_metelmann_", .)),
+    get_cor(obs, pred_stat_nowcasting, "pearson") %>% rename_with(~paste0("pearson_nowcasting_", .)),
+  )
 
 
 
@@ -259,7 +270,8 @@ vip_presence <- ggplot(vis_presence, aes(x = Variable, y = Importance, fill = si
   geom_bar(position="dodge", stat="identity") +
   theme_bw() +
   ggtitle("Presence model") +
-  ylab("Variable importance\n(loss in ROC AUC)") +
+  #ylab("Variable importance\n(loss in ROC AUC)") +
+  ylab("Variable importance") +
   theme( axis.title.x=element_blank(),
         axis.text.y=element_text(size=8)#,
         #axis.title.y = element_text(size=10)
@@ -273,7 +285,8 @@ vip_abundance <- ggplot(vis_abundance, aes(x = Variable, y = Importance, fill = 
   geom_bar(position="dodge", stat="identity") +
   theme_bw() +
   ggtitle("Abundance model") +
-  ylab("Variable importance\n(loss in Spearman corr.)") +
+  #ylab("Variable importance\n(loss in Spearman corr.)") +
+  ylab("Variable importance") +
   theme(axis.title.x=element_blank(),
         axis.text.y=element_text(size=8)#,
         #axis.title.y = element_text(size=10)
@@ -290,12 +303,30 @@ library(pdp)
 
 pred_wrapper_classif <- function(object, newdata) {
   p <- predict(object, newdata = newdata, type ="prob")[,"Presence"]
+  #c("avg" = mean(p), "sd" = sd(p))
   c("avg" = mean(p))
 }
 
 pdps_presence <- list()
 
 variables_presence <- as.character(unique(vis_presence$Variable))
+
+#### Ieva code pour smoother les PDP
+# ggplot(pd1, aes(x = TX_0_0))+
+#   #geom_point(aes(y = exp(mean_yhat)), size = 1, fill = "black", alpha = 1) +
+#   geom_smooth(aes(y = exp(mean_yhat), color="Mean prediction"), method = "loess", span = 0.2, se = F) + #span=0.4
+#   geom_ribbon(aes(ymin = exp(q25), ymax = exp(q75), fill = "25-50% range"), alpha = 0.3) +
+#   geom_rug(data = df, aes(x =TX_0_0), sides = "b", length = unit(0.025, "npc")) +
+#   theme_minimal() +
+#   theme(legend.position = "bottom",
+#         legend.title = element_blank(),
+#         legend.text = element_text(size= 14),
+#         axis.title.x = element_text(size = 10, face="bold"),
+#         axis.title.y = element_text(size = 10, face="bold"),
+#         plot.title = element_text(size= 12, face="bold"),
+#         axis.text.x = element_text(size=10),
+#         axis.text.y = element_text(size=10),
+
 
 for(i in 1:length(variables_presence)){
 
@@ -319,11 +350,13 @@ for(i in 1:length(variables_presence)){
   pd$site <- fct_relevel(pd$site, sites)
 
   pdps_presence[[i]] <- ggplot() +
-    geom_smooth(data=pd, aes_string(x=variables_presence[i], y="yhat", group = "site", color = "site"), se = F, method = "gam", formula = y ~ s(x, bs = "cs"), linewidth = 0.5) +
+    #geom_point(data=pd, aes_string(x=variables_presence[i], y="yhat", group = "site", color = "site"), size = 1, fill = "black", alpha = 1)  +
+    geom_smooth(data=pd, aes_string(x=variables_presence[i], y="yhat", group = "site", color = "site"), se = F, method = "loess",  span = 0.3, linewidth = 0.5) +
+    #geom_smooth(data=pd, aes_string(x=variables_presence[i], y="yhat", group = "site", color = "site"), se = F, method = "gam", formula = y ~ s(x, bs = "cs"), linewidth = 0.5) +
     geom_rug(data=df_mod_presence_nowcasting, aes_string(x = variables_presence[i]), sides="b") +
     theme_bw() +
     ylim(c(0,1)) +
-    ylab("Presence probability") +
+    ylab("Predicted probability of oviposition") +
     xlab(paste(variables_presence[i],
                case_when(grepl("TM|TX|TN",variables_presence[i]) ~ "(°C)",
                          grepl("UM",variables_presence[i]) ~ "(%)",
@@ -351,6 +384,7 @@ plot_pdps_presence <- patchwork::wrap_plots(pdps_presence) + plot_annotation(tit
 
 pred_wrapper_reg <- function(object, newdata) {
   p <- predict(object, newdata = newdata)
+  #c("avg" = mean(p), "sd" = sd(p))
   c("avg" = mean(p))
 }
 
@@ -381,11 +415,13 @@ for(i in 1:length(variables_abundance)){
   pd$site <- fct_relevel(pd$site, sites)
 
   pdps_abundance[[i]] <- ggplot() +
-    geom_smooth(data=pd, aes_string(x=variables_abundance[i], y="yhat", group = "site", color = "site"), se = F, method = "gam", formula = y ~ s(x, bs = "cs"), linewidth = 0.5) +
+    #geom_point(data=pd, aes_string(x=variables_abundance[i], y="yhat", group = "site", color = "site"), size = 1, fill = "black", alpha = 1)  +
+    geom_smooth(data=pd, aes_string(x=variables_abundance[i], y="yhat", group = "site", color = "site"), se = F, method = "loess",  span = 0.4, linewidth = 0.5) +
+    #geom_smooth(data=pd, aes_string(x=variables_abundance[i], y="yhat", group = "site", color = "site"), se = F, method = "gam", formula = y ~ s(x, bs = "cs"), linewidth = 0.5) +
     geom_rug(data=df_mod_abundance_nowcasting, aes_string(x = variables_abundance[i]), sides="b") +
     theme_bw() +
     ylim(c(0,40)) +
-    ylab("Abundance") +
+    ylab("Predicted eggs/trap (mean)") +
     xlab(paste(variables_abundance[i],
                case_when(grepl("TM|TX|TN",variables_abundance[i]) ~ "(°C)",
                          grepl("UM",variables_abundance[i]) ~ "(%)",
@@ -401,6 +437,7 @@ for(i in 1:length(variables_abundance)){
 }
 
 plot_pdps_abundance <- patchwork::wrap_plots(pdps_abundance) + plot_annotation(title = "Abundance model : PDP") + plot_layout(guides = "collect") & theme(legend.position='bottom')
+
 
 
 #(vip_presence + plot_pdps_presence  + plot_layout(widths = c(1, 5))) / (vip_abundance + plot_pdps_abundance  + plot_layout(widths = c(1, 5)))
@@ -511,7 +548,7 @@ library(lime)
 meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
   mutate(date=as.Date(date)) %>%
   mutate(week = week(date), Year = year(date)) %>%
-  dplyr::filter(date>=as.Date("2023-01-01" & date < "2025-01-01"))
+  dplyr::filter(date>="2023-01-01" & date < "2025-01-01")
 
 
 
@@ -716,7 +753,7 @@ plot_lime_v2 <- function(explanation){
 
 df_cv_paul <- df_cv_paul %>%
   mutate(date = as.Date(paste(Year, week, 1, sep="-"), "%Y-%U-%u"))  %>%
-  add_row(site = "BAYONNE", Year = 2024, week = 1, pred_stat_nowcasting = 2000, pred_stat_forecasting = NA) %>%
+  add_row(site = "BAYONNE", Year = 2024, week = 1, pred_stat_nowcasting = 4000, pred_stat_forecasting = NA) %>%
   add_row(site = "SAINT-MEDARD-EN-JALLES", Year = 2024, week = 1, pred_stat_nowcasting = 2000, pred_stat_forecasting = NA)
 
 # df_cv_paul <- read.csv("pred_llo.csv") %>%
