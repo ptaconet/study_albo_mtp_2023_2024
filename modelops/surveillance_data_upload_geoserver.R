@@ -45,8 +45,8 @@ con <- DBI::dbConnect(
   host = "postgresql-taconet.alwaysdata.net",
   dbname = "taconet_albopictus",
   port = 5432,
-  user = "taconet",
-  password = "HHKcue51"
+  user = "******",
+  password = "******"
 )
 
 sf::st_write(df, dsn = con, layer = "albopictus_field_surveillance",append = FALSE)

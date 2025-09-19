@@ -8,8 +8,8 @@ con <- dbConnect(
   host = "postgresql-taconet.alwaysdata.net",
   dbname = "taconet_albopictus",
   port = 5432,
-  user = "taconet",
-  password = "HHKcue51"
+  user = "******",
+  password = "******"
 )
 
 communes = st_read("https://www.data.gouv.fr/api/1/datasets/r/00c0c560-3ad1-4a62-9a29-c34c98c3701e","a_com2022")

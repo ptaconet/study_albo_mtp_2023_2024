@@ -636,8 +636,8 @@ con <- dbConnect(
   host = "postgresql-taconet.alwaysdata.net",
   dbname = "taconet_albopictus",
   port = 5432,
-  user = "taconet",
-  password = "HHKcue51"
+  user = "******",
+  password = "******"
 )
 
 st_write(departements_abundance, dsn = con, layer = "albopictus_abondance_departements",append = FALSE)
