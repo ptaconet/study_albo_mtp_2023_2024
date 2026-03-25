@@ -26,6 +26,7 @@ df_model <- df_model %>%
   filter(!is.na(NB_ALBO_TOT)) %>%
   filter(site!="RENNES")
 
+
 ###########################
 #########'Presence model preparation
 #########'First step: to select for meteorological and pollutants variables, for every type of variable, the time lag for which the r2 was the highest. Same work is realized for micro climatic, land cover (for each buffer) and socio demographic data.
@@ -95,9 +96,9 @@ p_ab <- df_model_abundance %>%
 
 #ggsave("02_Data/processed_data/plots/modelling_adults_abundance/plot_abundance_vs_selected_vars_poll.png",p_ab,width = 9.65, height = 7.42, units = "in") ## to save
 
-##### Second step: identify correlated variables that are greater than 0.7 (Pearson correlation coefficient)
+##### Second step: identify correlated variables that are greater than 0.8 (Pearson correlation coefficient)
 m <- cor(df_model_abundance[,predictors_abundance], method = "pearson", use = "pairwise.complete.obs")
-index <- which(abs(m) > .7 & abs(m) < 1,arr.ind = T)
+index <- which(abs(m) > .8 & abs(m) < 1,arr.ind = T)
 df_cor <- subset(as.data.frame(index) , row <= col)
 p <- cbind.data.frame(stock1 = rownames(m)[df_cor[,1]], stock2 = colnames(m)[df_cor[,2]])
 
@@ -110,30 +111,6 @@ df_model_abundance <- df_model %>%
   filter(NB_ALBO_TOT>0) %>%
   dplyr::select("site","Year", "week" ,  "NB_ALBO_TOT", "PRES_ALBO", predictors_abundance)
 
-
-## adding sin of day of year
-DOY <- df_model %>%
-  filter(NB_ALBO_TOT>0) %>%
-  mutate(doy = lubridate::yday(as.Date(
-    paste(Year, week, 1),
-    format = "%Y %U %u"))) %>%
-  #mutate(sin_doy = sin(2 * pi * doy / 365), cos_doy = cos(2 * pi * doy / 365))
-  mutate(sin_doy = sin(doy), cos_doy = cos( doy))
-
-df_model_abundance$sin_doy = DOY$sin_doy
-df_model_abundance$cos_doy = DOY$cos_doy
-
-#
-# df_model_abundance <- df_model_abundance %>%
-#   arrange(site, Year, week) %>%
-#   group_by(site) %>%
-#   mutate(NB_ALBO_TOT_prev = log(dplyr::lag(zoo::na.locf(NB_ALBO_TOT, na.rm = FALSE), order_by = week))) %>%
-#   ungroup() %>%
-#   filter(!is.na(NB_ALBO_TOT_prev))
-
-predictors_abundance <- c("TM_0_4","UM_0_11","RR_1_5","cos_doy", "week")
-
-df_weigths <- ifelse( df_model_abundance$NB_ALBO_TOT >30, 100, 1 )
 
 ###########################
 #########'Second stage of analysis: multivariate anaylsis using a leave-one-site-out cross validation and a leave-one-session-out cross validation (but juste to valdiate and evaluate the model)
@@ -167,7 +144,6 @@ tr = trainControl(method="cv", ## Definition of method sampling: cross validatio
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the ROC
 mod_presence <- caret::train(x = df_model_presence[,predictors_presence], y = df_model_presence$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"), importance = "permutation")
-
 
 #### Last step: to put predictions on same data frame
 df_model_presence$rowIndex <- seq(1,nrow(df_model_presence),1)
@@ -219,8 +195,8 @@ tr2 <- trainControl(
 
 
 #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the MAE  #### methods working more or less = "svmPoly"
-mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"), importance = "permutation")
-#mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "svmPoly", tuneLength = 4, trControl = tr2, metric = "MAE",  preProcess = c("center","scale"), importance = "permutation")
+# res_multiv_model_presence_nowcasting2
+mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"), importance = "permutation")# res_multiv_model_presence_nowcasting2_TOKEEPANDTEST
 
 #### Last step: to put predictions on same data frame
 df_model_abundance$rowIndex <- seq(1,nrow(df_model_abundance),1)
@@ -230,300 +206,3 @@ df_cv_abundance <- mod_abundance$pred %>%
 
 res_multiv_model_abundance_nowcasting <- list(model = mod_abundance, df_cv = df_cv_abundance, df_mod = df_model_abundance) ## to save models, data frame of the model and predictions
 saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcasting2.rds")
-#saveRDS(res_multiv_model_abundance_nowcasting,"res_multiv_model_abundance_nowcasting_tmax.rds")
-
-
-#
-# ##############
-# ## modèle explicatif
-# ################
-#
-#
-# predictors_presence <- c(predictors_presence,"site")
-# predictors_abundance <- c(predictors_abundance,"site")
-#
-# tr = trainControl(method="none", ## Definition of method sampling: cross validation
-#                   summaryFunction = twoClassSummary,#comboSummary, ## Calcul of ROC and AUC
-#                   classProbs = TRUE,
-#                   savePredictions = 'final',
-#                   verboseIter = FALSE
-# )
-#
-# #### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the ROC
-# mod_presence <- caret::train(x = df_model_presence[,predictors_presence], y = df_model_presence$PRES_ALBO, method = "ranger", tuneLength = 1, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
-#
-#
-# #### Last step: to put predictions on same data frame
-#
-# df_cv_presence <- predict(mod_presence) %>%
-#   bind_cols(predict(mod_presence, type = 'prob')$Presence) %>%
-#   bind_cols(df_model_presence) %>%
-#   dplyr::rename(pred = ...1, Presence = ...2, obs = PRES_ALBO ) %>%
-#   dplyr::select(pred,Presence,obs,site,week,Year) %>%
-#   mutate(obs = ifelse(obs == "Absence",0,1)) %>%
-#   dplyr::rename(pred_final = pred, pred = Presence)
-#
-# res_multiv_model_presence_explanatory <- list(model = mod_presence, df_cv = df_cv_presence, df_mod = df_model_presence) ## to save models, data frame of the model and predictions
-# saveRDS(res_multiv_model_presence_explanatory,"res_multiv_model_presence_explanatory.rds")
-#
-#
-# # abundance
-#
-# tr = trainControl(method="none",
-#                   savePredictions = 'final',
-#                   summaryFunction = spearmcor)
-#
-# mod_abundance <- caret::train(x = df_model_abundance[,predictors_abundance], y = df_model_abundance$NB_ALBO_TOT, method = "ranger", tuneLength = 1, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"),importance = "permutation", local.importance = "TRUE")
-#
-#
-# df_cv_abundance <- predict(mod_abundance)  %>%
-#   bind_cols(df_model_abundance) %>%
-#   dplyr::rename(pred = ...1, obs = NB_ALBO_TOT) %>%
-#   dplyr::select(pred,obs,site,week,Year)
-#
-# res_multiv_model_abundance_explanatory <- list(model = mod_abundance, df_cv = df_cv_abundance, df_mod = df_model_abundance) ## to save models, data frame of the model and predictions
-# saveRDS(res_multiv_model_abundance_explanatory,"res_multiv_model_abundance_explanatory.rds")
-#
-
-###########################################
-###########################################
-## Predictions in all sites for all weeks
-###########################################
-###########################################
-
-meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
-  dplyr::filter(!(site %in% c("RENNES","MONTPELLIER")))
-
-
-fun_pred_presence <- function(df_model_presence, predictors_presence, th_site){
-
-  df_model_presence2 <- df_model_presence %>%
-    filter(site!=th_site)
-
-  cv_col <- "site"
-
-  indices_cv <- CAST::CreateSpacetimeFolds(df_model_presence2, spacevar = cv_col, k = length(unique(unlist(df_model_presence2[,cv_col])))) #### Take into acocunt spatil avariability
-
-    tr = trainControl(method="cv", ## Definition of method sampling: cross validation
-                    index = indices_cv$index,  ##  list of elements to sampling
-                    indexOut = indices_cv$indexOut,##  list of items to be set aside for each resampling
-                    summaryFunction = twoClassSummary,#comboSummary, ## Calcul of ROC and AUC
-                    classProbs = TRUE,
-                    savePredictions = 'final',
-                    verboseIter = FALSE
-  )
-
-  mod_presence <- caret::train(x = df_model_presence2[,predictors_presence], y = df_model_presence2$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"))
-
-
-  meteo2 <- meteo %>%
-    dplyr::filter(site==th_site) %>%
-    filter(!is.na(UM_5_11))
-
-  pred <- predict(mod_presence,meteo2)
-  pred_prob <- predict(mod_presence, meteo2, type = 'prob')$Presence
-
-  df_cv_presence <- cbind(meteo2, pred, pred_prob)
-
-  return(df_cv_presence)
-}
-
-
-fun_pred_abundance <- function(df_model_abundance, predictors_abundance, th_site, meteo_pred){
-
-  df_model_abundance2 <- df_model_abundance %>%
-    filter(site!=th_site)
-
-  cv_col <- "site"
-
-  indices_cv <- CAST::CreateSpacetimeFolds(df_model_abundance2, spacevar = cv_col, k = length(unique(unlist(df_model_abundance2[,cv_col])))) #### Take into acocunt spatil avariability
-
-  tr = trainControl(method="cv",
-                    index = indices_cv$index,
-                    indexOut = indices_cv$indexOut,
-                    savePredictions = 'final',
-                    summaryFunction = spearmcor)
-
-   mod_abundance <- caret::train(x = df_model_abundance2[,predictors_abundance], y = df_model_abundance2$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"))
-
-
-   meteo2 <- meteo_pred %>%
-     filter(!is.na(UM_5_11))
-
-  pred_abundance <- predict(mod_abundance,meteo2)
-
-  df_cv_abundance<- cbind(meteo2, pred_abundance)
-
-  return(df_cv_abundance)
-}
-
-
-sites <- unique(df_model_presence$site)
-
-pred_llo_pres <- data.frame()
-pred_llo_abundance <- data.frame()
-pred_llo <- data.frame()
-
-for(i in 1:length(sites)){
-
-  th_pred_llo_pres <- fun_pred_presence(df_model_presence,predictors_presence,sites[i])
-  pred_llo_pres <- rbind(pred_llo_pres,th_pred_llo_pres)
-
-  meteo_pred <- th_pred_llo_pres %>%
-    filter(pred == "Presence")
-
-  th_pred_llo_abundance <- fun_pred_abundance(df_model_abundance,predictors_abundance,sites[i], meteo_pred)
-  pred_llo_abundance <- rbind(pred_llo_abundance,th_pred_llo_abundance)
-
-
-  th_pred_llo <- th_pred_llo_pres %>%
-    filter(pred == "Absence") %>%
-    mutate(pred_abundance=0) %>%
-    bind_rows(th_pred_llo_abundance) %>%
-    mutate(pred_abundance = ifelse(pred=="Presence", exp(pred_abundance), 0)) %>%
-    mutate(date = as.Date(date))
-
-  pred_llo <- rbind(pred_llo,th_pred_llo)
-
-}
-
-pred_llo$Year <- year(pred_llo$date)
-pred_llo$week <- week(pred_llo$date)
-
-
-df_model <- df_model %>%
-  mutate(date = as.Date(paste(Year, week, 1, sep = "-"), "%Y-%U-%u"))
-
-ggplot() +
-  #eom_point(data = pred_llo, aes(x = date, y = pred_abundance, group = site), color = "red") +
-  geom_line(data = pred_llo, aes(x = date, y = pred_abundance, group = site), color = "red") +
-  #geom_point(data = df_model, aes(x = date, y = NB_ALBO_TOT, group = site), color = "black") +
-  geom_line(data = df_model, aes(x = date, y = NB_ALBO_TOT, group = site), color = "black") +
-  facet_wrap(.~site)
-
-write.csv(pred_llo,"pred_llo.csv", row.names = F)
-
-
-
-
-
-
-
-###### lto
-
-meteo <- read.csv(file.path("data","processed","df_meteo_predictions.csv")) %>%
-  dplyr::filter(!(site %in% c("RENNES","MONTPELLIER"))) %>%
-  mutate(Year=lubridate::year(as.Date(date)))
-
-
-fun_pred_presence <- function(df_model_presence, predictors_presence, th_year){
-
-  df_model_presence2 <- df_model_presence %>%
-    filter(Year!=th_year)
-
-tr = trainControl(method="cv", ## Definition of method sampling: cross validation
-                  summaryFunction = twoClassSummary,#comboSummary, ## Calcul of ROC and AUC
-                  classProbs = TRUE,
-                  savePredictions = 'final',
-                  verboseIter = FALSE
-)
-
-#### Third step: realisation of the model of random forest, with the method of permutation to evaluate variable importance and calculating the ROC
-mod_presence <- caret::train(x = df_model_presence2[,predictors_presence], y = df_model_presence2$PRES_ALBO, method = "ranger", tuneLength = 10, trControl = tr, metric = "ROC", maximize = TRUE,  preProcess = c("center","scale"))
-
-meteo2 <- meteo %>%
-  dplyr::filter(Year==th_year) %>%
-  filter(!is.na(UM_5_11))
-
-pred <- predict(mod_presence,meteo2)
-pred_prob <- predict(mod_presence, meteo2, type = 'prob')$Presence
-
-df_cv_presence <- cbind(meteo2, pred, pred_prob)
-
-return(df_cv_presence)
-}
-
-fun_pred_abundance <- function(df_model_abundance, predictors_abundance, th_year, meteo_pred){
-
-  df_model_abundance2 <- df_model_abundance %>%
-    filter(Year!=th_year)
-
-
-  tr = trainControl(method="cv",
-                    savePredictions = 'final',
-                    summaryFunction = spearmcor)
-
-  mod_abundance <- caret::train(x = df_model_abundance2[,predictors_abundance], y = df_model_abundance2$NB_ALBO_TOT, method = "ranger", tuneLength = 10, trControl = tr, metric = "spearman", maximize = TRUE,  preProcess = c("center","scale"))
-
-
-  meteo2 <- meteo_pred %>%
-    filter(!is.na(UM_5_11))
-
-  pred_abundance <- predict(mod_abundance,meteo2)
-
-  df_cv_abundance<- cbind(meteo2, pred_abundance)
-
-  return(df_cv_abundance)
-}
-
-
-year <- unique(df_model_presence$Year)
-
-pred_lto_pres <- data.frame()
-pred_lto_abundance <- data.frame()
-pred_lto <- data.frame()
-
-for(i in 1:length(year)){
-
-  th_pred_lto_pres <- fun_pred_presence(df_model_presence,predictors_presence,year[i])
-  pred_lto_pres <- rbind(pred_lto_pres,th_pred_lto_pres)
-
-  meteo_pred <- th_pred_lto_pres %>%
-    filter(pred == "Presence")
-
-  th_pred_lto_abundance <- fun_pred_abundance(df_model_abundance,predictors_abundance,year[i], meteo_pred)
-  pred_lto_abundance <- rbind(pred_lto_abundance,th_pred_lto_abundance)
-
-
-  th_pred_lto <- th_pred_lto_pres %>%
-    filter(pred == "Absence") %>%
-    mutate(pred_abundance=0) %>%
-    bind_rows(th_pred_lto_abundance) %>%
-    mutate(pred_abundance = ifelse(pred=="Presence", exp(pred_abundance), 0)) %>%
-    mutate(date = as.Date(date))
-
-  pred_lto <- rbind(pred_lto,th_pred_lto)
-
-}
-
-pred_lto$Year <- year(pred_lto$date)
-pred_lto$week <- week(pred_lto$date)
-
-
-df_model <- df_model %>%
-  mutate(date = as.Date(paste(Year, week, 1, sep = "-"), "%Y-%U-%u"))
-
-ggplot() +
-  geom_line(data = pred_lto, aes(x = date, y = pred_abundance, group = site), color = "red") +
-  geom_line(data = df_model, aes(x = date, y = NB_ALBO_TOT, group = site), color = "black") +
-  facet_wrap(.~site)
-
-write.csv(pred_llo,"pred_lto.csv", row.names = F)
-
-
-ggplot() +
-  geom_line(data = pred_lto %>% filter(site %in% c("MURVIEL-LES-MONTPELLIER","PEROLS")), aes(x = date, y = pred_abundance, group = site, color = site)) +
-  geom_line(data = df_model %>% filter(site=="MURVIEL-LES-MONTPELLIER"), aes(x = date, y = NB_ALBO_TOT), color = "black")
-
-ggplot() +
-  geom_line(data = pred_lto %>% filter(site %in% c("BAYONNE","SAINT-MEDARD-EN-JALLES")), aes(x = date, y = pred_abundance, group = site, color = site)) +
-  geom_line(data = df_model %>% filter(site=="SAINT-MEDARD-EN-JALLES"), aes(x = date, y = NB_ALBO_TOT), color = "black")
-
-
-pred_lto2 <- pred_lto %>%
-  left_join(df_model %>% dplyr::select(site,Year,  week, NB_ALBO_TOT), by = c("site","Year","week")) %>%
-  dplyr::select(site, date, NB_ALBO_TOT, pred_abundance ) %>%
-  pivot_wider(names_from = site, values_from = c("pred_abundance","NB_ALBO_TOT")) %>%
-  dplyr::select(-date)
-
-View(cor(pred_lto2, use = "na.or.complete"))
